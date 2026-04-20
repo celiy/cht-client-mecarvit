@@ -1,0 +1,14 @@
+{
+  "name": "cht-client-mecarvit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Mecarvit client: pages, components and js consumed by cht-base via the @client alias.",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "~5.9.3",
+    "vue": "^3.5.25",
+    "vue-router": "^4.6.4"
+  }
+}
