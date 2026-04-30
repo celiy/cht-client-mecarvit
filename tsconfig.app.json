@@ -8,7 +8,7 @@
       "@base/*": ["../cht-base/src/*"],
       "@design/*": ["../cht-design-system/src/*"],
       "@shared/*": ["../cht-shared/src/*"],
-      "@client/*": ["./src/*"]
+      "@/*": ["./src/*"]
     },
 
     /* Linting */
