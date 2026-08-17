@@ -1,0 +1,11 @@
+{
+    "name": "mecarvit",
+    "siteTitle": "Mecarvit",
+    "frontend": {
+        "repo": "https://github.com/celiy/cht-client-mecarvit.git"
+    },
+    "backend": {
+        "repo": "https://github.com/celiy/cht-backend-mecarvit.git",
+        "script": "dev"
+    }
+}
