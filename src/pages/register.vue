@@ -3,18 +3,29 @@
         <Card class="w-full max-w-md">
             <template #header>
                 <h1 class="text-xl font-semibold">
-                    Entrar
+                    Criar conta
                 </h1>
 
                 <p class="text-sm text-muted-foreground!">
-                    Acesse sua conta com email e senha.
+                    Cadastre-se com nome, email e senha.
                 </p>
             </template>
 
             <template #body>
                 <form class="flex flex-col gap-4" @submit.prevent="submit">
                     <Input
-                        id="login-email"
+                        id="register-name"
+                        v-model="name"
+                        type="text"
+                        label="Nome"
+                        placeholder="Seu nome"
+                        autocomplete="name"
+                        :error="errors.name"
+                        required
+                    />
+
+                    <Input
+                        id="register-email"
                         v-model="email"
                         type="email"
                         label="Email"
@@ -25,12 +36,12 @@
                     />
 
                     <Input
-                        id="login-password"
+                        id="register-password"
                         v-model="password"
                         type="password"
                         label="Senha"
-                        placeholder="Sua senha"
-                        autocomplete="current-password"
+                        placeholder="Mínimo de 8 caracteres"
+                        autocomplete="new-password"
                         :error="errors.password"
                         required
                     />
@@ -40,7 +51,7 @@
                     </p>
 
                     <Button
-                        label="Entrar"
+                        label="Cadastrar"
                         variant="primary"
                         class="w-full"
                         type="submit"
@@ -48,10 +59,10 @@
                     />
 
                     <p class="text-sm text-muted-foreground text-center">
-                        Não tem conta?
+                        Já tem conta?
 
-                        <RouterLink class="text-primary hover:underline" to="/register">
-                            Cadastre-se
+                        <RouterLink class="text-primary hover:underline" to="/login">
+                            Entrar
                         </RouterLink>
                     </p>
                 </form>
@@ -74,7 +85,7 @@ interface AuthApiResponse {
 }
 
 export default defineComponent({
-    name: "MecarvitLoginPage",
+    name: "MecarvitRegisterPage",
 
     components: {
         Button,
@@ -84,11 +95,13 @@ export default defineComponent({
 
     data() {
         return {
+            name: "",
             email: "",
             password: "",
             loading: false,
             formError: "",
             errors: {
+                name: "",
                 email: "",
                 password: ""
             }
@@ -98,6 +111,7 @@ export default defineComponent({
     methods: {
         clearErrors() {
             this.formError = "";
+            this.errors.name = "";
             this.errors.email = "";
             this.errors.password = "";
         },
@@ -107,28 +121,25 @@ export default defineComponent({
             this.loading = true;
 
             try {
-                const response = await this.$http.post<AuthApiResponse>("/api/auth/login", {
+                const response = await this.$http.post<AuthApiResponse>("/api/auth/register", {
+                    name: this.name.trim(),
                     email: this.email.trim(),
                     password: this.password
                 });
 
                 persistAuthToken(response.data.data.token);
-
-                const redirect = typeof this.$route.query.redirect === "string"
-                    ? this.$route.query.redirect
-                    : "/home";
-
-                await this.$router.push(redirect);
+                await this.$router.push("/home");
             } catch (error) {
                 if (error instanceof HttpError) {
                     this.formError = error.message;
+                    this.errors.name = error.fields?.name ?? "";
                     this.errors.email = error.fields?.email ?? "";
                     this.errors.password = error.fields?.password ?? "";
 
                     return;
                 }
 
-                this.formError = "Não foi possível entrar. Tente novamente.";
+                this.formError = "Não foi possível cadastrar. Tente novamente.";
             } finally {
                 this.loading = false;
             }

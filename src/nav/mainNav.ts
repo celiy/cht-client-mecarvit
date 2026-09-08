@@ -16,10 +16,5 @@ export const mainNav = [
         type: "link" as const,
         label: "Home",
         link: "/home"
-    },
-    {
-        type: "link" as const,
-        label: "Login",
-        link: "/login"
     }
 ];
