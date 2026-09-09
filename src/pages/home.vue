@@ -1,9 +1,7 @@
 <template>
-    <main class="p-8 flex flex-col gap-6 max-w-2xl">
+    <main class="flex max-w-2xl flex-col gap-6 p-8">
         <section>
-            <h1 class="text-2xl font-semibold">
-                Home
-            </h1>
+            <h1 class="text-2xl font-semibold">Home</h1>
 
             <p class="mt-2 text-muted-foreground!">
                 Área autenticada do {{ $project.labels.siteTitle }}.
@@ -12,25 +10,19 @@
 
         <Card v-if="loading">
             <template #body>
-                <p class="text-muted-foreground!">
-                    Carregando perfil...
-                </p>
+                <p class="text-muted-foreground!">Carregando perfil...</p>
             </template>
         </Card>
 
         <Card v-else-if="user">
             <template #header>
-                <h2 class="text-lg font-semibold">
-                    Olá, {{ user.name }}
-                </h2>
+                <h2 class="text-lg font-semibold">Olá, {{ user.name }}</h2>
             </template>
 
             <template #body>
                 <dl class="grid gap-3 text-sm">
                     <div>
-                        <dt class="text-muted-foreground!">
-                            Email
-                        </dt>
+                        <dt class="text-muted-foreground!">Email</dt>
 
                         <dd>
                             {{ user.email }}
@@ -38,9 +30,7 @@
                     </div>
 
                     <div>
-                        <dt class="text-muted-foreground!">
-                            ID
-                        </dt>
+                        <dt class="text-muted-foreground!">ID</dt>
 
                         <dd>
                             {{ user.id }}
@@ -50,7 +40,12 @@
             </template>
 
             <template #footer>
-                <Button label="Sair" variant="secondary" @click="logout" />
+                <Button
+                    label="Sair"
+                    variant="secondary"
+
+                    @click="logout"
+                />
             </template>
         </Card>
 
@@ -60,7 +55,13 @@
                     {{ loadError || "Não foi possível carregar o perfil." }}
                 </p>
 
-                <Button label="Tentar novamente" variant="secondary" class="mt-4" @click="loadProfile" />
+                <Button
+                    label="Tentar novamente"
+                    variant="secondary"
+                    class="mt-4"
+
+                    @click="loadProfile"
+                />
             </template>
         </Card>
     </main>
@@ -112,9 +113,8 @@ export default defineComponent({
                 this.user = response.data.data;
             } catch (error) {
                 this.user = null;
-                this.loadError = error instanceof HttpError
-                    ? error.message
-                    : "Erro ao carregar perfil.";
+                this.loadError =
+                    error instanceof HttpError ? error.message : "Erro ao carregar perfil.";
             } finally {
                 this.loading = false;
             }

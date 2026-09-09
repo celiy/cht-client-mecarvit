@@ -1,12 +1,26 @@
 <template>
-    <main>
-        <Sidebar :nav-items="mainNav">
+    <main class="relative flex h-dvh w-full flex-col overflow-hidden">
+        <Sidebar
+            :nav-items="[
+                {
+                    type: 'section',
+                    label: 'Mecarvit'
+                },
+                {
+                    type: 'link',
+                    label: 'Index',
+                    link: '/'
+                },
+                {
+                    type: 'link',
+                    label: 'Home',
+                    link: '/home'
+                }
+            ]"
+        >
             <RouterView />
         </Sidebar>
     </main>
 </template>
 
-<script setup lang="ts">
-import Sidebar from "@design/components/custom/Sidebar.vue";
-import { mainNav } from "../nav/mainNav";
-</script>
+<script setup lang="ts"></script>
