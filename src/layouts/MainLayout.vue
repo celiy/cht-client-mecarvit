@@ -1,7 +1,8 @@
 <template>
     <main class="relative flex h-dvh w-full flex-col overflow-hidden">
         <Sidebar
-            title=""
+            :title="$mecarvit.company?.nome"
+            description="Sistema Mecarvit"
             :nav-items="[
                 {
                     type: 'section',
