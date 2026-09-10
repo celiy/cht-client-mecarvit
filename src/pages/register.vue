@@ -2,25 +2,49 @@
     <main class="flex min-h-dvh items-center justify-center p-6">
         <Card class="w-full max-w-md">
             <template #header>
-                <h1 class="text-xl font-semibold">
-                    Criar conta
-                </h1>
+                <h4 class="text-xl font-semibold">Cadastrar oficina</h4>
 
-                <p class="text-sm text-muted-foreground!">
-                    Cadastre-se com nome, email e senha.
+                <p class="mb-2 text-sm text-muted-foreground!">
+                    Crie a oficina e a conta do gestor.
                 </p>
             </template>
 
             <template #body>
-                <form class="flex flex-col gap-4" @submit.prevent="submit">
+                <form
+                    class="flex flex-col gap-4"
+
+                    @submit.prevent="submit"
+                >
                     <Input
-                        id="register-name"
-                        v-model="name"
+                        id="register-empresa"
+                        v-model="empresaNome"
                         type="text"
-                        label="Nome"
-                        placeholder="Seu nome"
+                        label="Nome da oficina"
+                        placeholder="Oficina Central"
+                        autocomplete="organization"
+                        :error="errors.empresaNome"
+                        required
+                    />
+
+                    <Input
+                        id="register-nome"
+                        v-model="nome"
+                        type="text"
+                        label="Seu nome"
+                        placeholder="Nome completo"
                         autocomplete="name"
-                        :error="errors.name"
+                        :error="errors.nome"
+                        required
+                    />
+
+                    <Input
+                        id="register-cpf"
+                        v-model="cpf"
+                        type="cpf"
+                        label="CPF"
+                        placeholder="000.000.000-00"
+                        autocomplete="off"
+                        :error="errors.cpf"
                         required
                     />
 
@@ -36,17 +60,22 @@
                     />
 
                     <Input
-                        id="register-password"
-                        v-model="password"
+                        id="register-senha"
+                        v-model="senha"
                         type="password"
                         label="Senha"
                         placeholder="Mínimo de 8 caracteres"
                         autocomplete="new-password"
-                        :error="errors.password"
+                        helper-text="Mínimo de 8 caracteres"
+                        :error="errors.senha"
                         required
                     />
 
-                    <p v-if="formError" class="text-sm text-destructive">
+                    <p
+                        v-if="formError"
+
+                        class="text-sm text-destructive"
+                    >
                         {{ formError }}
                     </p>
 
@@ -58,13 +87,16 @@
                         :disabled="loading"
                     />
 
-                    <p class="text-sm text-muted-foreground text-center">
+                    <small class="text-center text-sm">
                         Já tem conta?
 
-                        <RouterLink class="text-primary hover:underline" to="/login">
+                        <RouterLink
+                            class="text-primary hover:underline"
+                            to="/login"
+                        >
                             Entrar
                         </RouterLink>
-                    </p>
+                    </small>
                 </form>
             </template>
         </Card>
@@ -76,13 +108,9 @@ import { defineComponent } from "vue";
 import Button from "@design/components/Button.vue";
 import Card from "@design/components/Card.vue";
 import Input from "@design/components/Input.vue";
-import { HttpError, persistAuthToken } from "@base/http";
-
-interface AuthApiResponse {
-    data: {
-        token: string;
-    };
-}
+import { HttpError } from "@base/http";
+import { validateCadastro } from "@shared/validators/mecarvit";
+import { completeAuth, type AuthApiResponse } from "../js/auth";
 
 export default defineComponent({
     name: "MecarvitRegisterPage",
@@ -95,15 +123,19 @@ export default defineComponent({
 
     data() {
         return {
-            name: "",
+            empresaNome: "",
+            nome: "",
+            cpf: "",
             email: "",
-            password: "",
+            senha: "",
             loading: false,
             formError: "",
             errors: {
-                name: "",
+                empresaNome: "",
+                nome: "",
+                cpf: "",
                 email: "",
-                password: ""
+                senha: ""
             }
         };
     },
@@ -111,31 +143,55 @@ export default defineComponent({
     methods: {
         clearErrors() {
             this.formError = "";
-            this.errors.name = "";
+            this.errors.empresaNome = "";
+            this.errors.nome = "";
+            this.errors.cpf = "";
             this.errors.email = "";
-            this.errors.password = "";
+            this.errors.senha = "";
+        },
+
+        applyFields(fields: Record<string, string> | undefined) {
+            if (!fields) {
+                return;
+            }
+
+            this.errors.empresaNome = fields["empresa.nome"] ?? fields.empresa ?? "";
+            this.errors.nome = fields["usuario.nome"] ?? fields.nome ?? "";
+            this.errors.cpf = fields["usuario.cpf"] ?? fields.cpf ?? "";
+            this.errors.email = fields["usuario.email"] ?? fields.email ?? "";
+            this.errors.senha = fields["usuario.senha"] ?? fields.senha ?? fields.password ?? "";
         },
 
         async submit() {
             this.clearErrors();
+
+            const body = {
+                empresa: { nome: this.empresaNome.trim() },
+                usuario: {
+                    cpf: this.cpf.trim(),
+                    nome: this.nome.trim(),
+                    email: this.email.trim(),
+                    senha: this.senha
+                }
+            };
+            const clientErrors = validateCadastro(body);
+
+            if (clientErrors) {
+                this.applyFields(clientErrors);
+                this.formError = "Verifique os campos e tente novamente.";
+                return;
+            }
+
             this.loading = true;
 
             try {
-                const response = await this.$http.post<AuthApiResponse>("/api/auth/register", {
-                    name: this.name.trim(),
-                    email: this.email.trim(),
-                    password: this.password
-                });
+                const response = await this.$http.post<AuthApiResponse>("/api/cadastro", body);
 
-                persistAuthToken(response.data.data.token);
-                await this.$router.push("/home");
+                await completeAuth(this.$router, this.$route, response.data.data);
             } catch (error) {
                 if (error instanceof HttpError) {
                     this.formError = error.message;
-                    this.errors.name = error.fields?.name ?? "";
-                    this.errors.email = error.fields?.email ?? "";
-                    this.errors.password = error.fields?.password ?? "";
-
+                    this.applyFields(error.fields);
                     return;
                 }
 

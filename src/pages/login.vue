@@ -2,17 +2,19 @@
     <main class="flex min-h-dvh items-center justify-center p-6">
         <Card class="w-full max-w-md">
             <template #header>
-                <h1 class="text-xl font-semibold">
-                    Entrar
-                </h1>
+                <h4 class="text-xl font-semibold">Entrar</h4>
 
-                <p class="text-sm text-muted-foreground!">
-                    Acesse sua conta com email e senha.
+                <p class="mb-2 text-sm text-muted-foreground!">
+                    Acesse com email e senha. Funcionários precisam selecionar a oficina.
                 </p>
             </template>
 
             <template #body>
-                <form class="flex flex-col gap-4" @submit.prevent="submit">
+                <form
+                    class="flex flex-col gap-4"
+
+                    @submit.prevent="submit"
+                >
                     <Input
                         id="login-email"
                         v-model="email"
@@ -26,18 +28,42 @@
 
                     <Input
                         id="login-password"
-                        v-model="password"
+                        v-model="senha"
                         type="password"
                         label="Senha"
                         placeholder="Sua senha"
                         autocomplete="current-password"
-                        :error="errors.password"
+                        :error="errors.senha"
                         required
                     />
 
-                    <p v-if="formError" class="text-sm text-destructive">
-                        {{ formError }}
-                    </p>
+                    <div v-if="empresaOptions.length > 0">
+                        <Select
+                            id="login-empresa"
+                            v-model="empresaId"
+                            label="Oficina"
+                            header="Selecione a oficina"
+                            :options="empresaOptions"
+                        />
+
+                        <p
+                            v-if="errors.empresaId"
+
+                            class="mt-2 text-sm text-destructive"
+                        >
+                            {{ errors.empresaId }}
+                        </p>
+                    </div>
+
+                    <Item
+                        v-if="formError"
+
+                        icon="fa-circle-xmark"
+                        variant="destructive"
+                        type="alert"
+                        :hover-effect="false"
+                        :description="formError"
+                    />
 
                     <Button
                         label="Entrar"
@@ -47,13 +73,16 @@
                         :disabled="loading"
                     />
 
-                    <p class="text-sm text-muted-foreground text-center">
+                    <small class="text-center text-sm">
                         Não tem conta?
 
-                        <RouterLink class="text-primary hover:underline" to="/register">
-                            Cadastre-se
+                        <RouterLink
+                            class="text-primary hover:underline"
+                            to="/register"
+                        >
+                            Cadastre a oficina
                         </RouterLink>
-                    </p>
+                    </small>
                 </form>
             </template>
         </Card>
@@ -65,13 +94,10 @@ import { defineComponent } from "vue";
 import Button from "@design/components/Button.vue";
 import Card from "@design/components/Card.vue";
 import Input from "@design/components/Input.vue";
-import { HttpError, persistAuthToken } from "@base/http";
-
-interface AuthApiResponse {
-    data: {
-        token: string;
-    };
-}
+import Select from "@design/components/Select.vue";
+import { HttpError } from "@base/http";
+import { validateLogin } from "@shared/validators/auth";
+import { completeAuth, type AuthApiResponse, type EmpresaLocal } from "../js/auth";
 
 export default defineComponent({
     name: "MecarvitLoginPage",
@@ -79,52 +105,120 @@ export default defineComponent({
     components: {
         Button,
         Card,
-        Input
+        Input,
+        Select
     },
 
     data() {
         return {
             email: "",
-            password: "",
+            senha: "",
+            empresaId: "" as string | number,
+            empresas: [] as EmpresaLocal[],
             loading: false,
             formError: "",
             errors: {
                 email: "",
-                password: ""
+                senha: "",
+                empresaId: ""
             }
         };
+    },
+
+    computed: {
+        empresaOptions() {
+            return this.empresas.map((empresa) => ({
+                label: empresa.nome,
+                value: String(empresa.id)
+            }));
+        }
+    },
+
+    mounted() {
+        void this.loadEmpresas();
     },
 
     methods: {
         clearErrors() {
             this.formError = "";
             this.errors.email = "";
-            this.errors.password = "";
+            this.errors.senha = "";
+            this.errors.empresaId = "";
+        },
+
+        parsedEmpresaId(): number | undefined {
+            if (this.empresaId === "" || this.empresaId === undefined || this.empresaId === null) {
+                return undefined;
+            }
+
+            const id = Number(this.empresaId);
+
+            if (!Number.isInteger(id) || id <= 0) {
+                return undefined;
+            }
+
+            return id;
+        },
+
+        async loadEmpresas() {
+            try {
+                const response = await this.$http.get<{ data: EmpresaLocal[] }>(
+                    "/api/empresa-locais"
+                );
+                this.empresas = response.data.data ?? [];
+
+                if (this.empresas.length === 1) {
+                    const only = this.empresas[0];
+
+                    if (only) {
+                        this.empresaId = String(only.id);
+                    }
+                }
+            } catch {
+                this.empresas = [];
+            }
         },
 
         async submit() {
             this.clearErrors();
+
+            const empresaId = this.parsedEmpresaId();
+            const payload = {
+                email: this.email.trim(),
+                senha: this.senha,
+                empresaId
+            };
+            const clientErrors = validateLogin(payload);
+
+            if (clientErrors) {
+                this.errors.email = clientErrors.email ?? "";
+                this.errors.senha = clientErrors.senha ?? clientErrors.password ?? "";
+                this.errors.empresaId = clientErrors.empresaId ?? "";
+                this.formError = "Verifique os campos e tente novamente.";
+                return;
+            }
+
             this.loading = true;
 
             try {
-                const response = await this.$http.post<AuthApiResponse>("/api/auth/login", {
-                    email: this.email.trim(),
-                    password: this.password
-                });
+                const body: { email: string; senha: string; empresaId?: number } = {
+                    email: payload.email,
+                    senha: payload.senha
+                };
 
-                persistAuthToken(response.data.data.token);
+                if (empresaId !== undefined) {
+                    body.empresaId = empresaId;
+                }
 
-                const redirect = typeof this.$route.query.redirect === "string"
-                    ? this.$route.query.redirect
-                    : "/home";
+                const response = await this.$http.post<AuthApiResponse>("/api/login", body);
 
-                await this.$router.push(redirect);
+                await completeAuth(this.$router, this.$route, response.data.data);
             } catch (error) {
                 if (error instanceof HttpError) {
                     this.formError = error.message;
                     this.errors.email = error.fields?.email ?? "";
-                    this.errors.password = error.fields?.password ?? "";
-
+                    this.errors.senha = error.fields?.senha ?? error.fields?.password ?? "";
+                    this.errors.empresaId = error.fields?.empresaId ?? "";
                     return;
                 }
 

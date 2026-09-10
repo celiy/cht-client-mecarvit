@@ -5,6 +5,13 @@ import IndexPage from "./pages/index.vue";
 import HomePage from "./pages/home.vue";
 import LoginPage from "./pages/login.vue";
 import RegisterPage from "./pages/register.vue";
+import ChangePasswordPage from "./pages/changePassword.vue";
+import FuncionariosPage from "./pages/cadastros/funcionarios.vue";
+import ClientesPage from "./pages/cadastros/clientes.vue";
+import VeiculosPage from "./pages/cadastros/veiculos.vue";
+import OrdemServicoPage from "./pages/ordem-servico/ordem-servico.vue";
+import EntradasSaidasPage from "./pages/financeiro/entradas-saidas.vue";
+import UsuarioPage from "./pages/usuario.vue";
 
 const routes: RouteRecordRaw[] = [
     {
@@ -24,6 +31,14 @@ const routes: RouteRecordRaw[] = [
         }
     },
     {
+        path: "/trocar-senha",
+        name: "change-password",
+        component: ChangePasswordPage,
+        meta: {
+            requiresAuth: true
+        }
+    },
+    {
         path: "/",
         component: MainLayout,
         meta: {
@@ -31,7 +46,17 @@ const routes: RouteRecordRaw[] = [
         },
         children: [
             { path: "", name: "index", component: IndexPage },
-            { path: "home", name: "home", component: HomePage }
+            { path: "home", name: "home", component: HomePage },
+            { path: "usuario", name: "usuario", component: UsuarioPage },
+            { path: "funcionarios", name: "funcionarios", component: FuncionariosPage },
+            { path: "clientes", name: "clientes", component: ClientesPage },
+            { path: "veiculos", name: "veiculos", component: VeiculosPage },
+            { path: "ordem-servico", name: "ordem-servico", component: OrdemServicoPage },
+            {
+                path: "registro-entrada-saida",
+                name: "registro-entrada-saida",
+                component: EntradasSaidasPage
+            }
         ]
     }
 ];

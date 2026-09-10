@@ -1,5 +1,11 @@
+import type { App } from "vue";
 import type { Router } from "vue-router";
 import { http } from "@base/http";
+import {
+    loadCurrentCompany,
+    loadCurrentUser,
+    mecarvitPlugin
+} from "./js/mecarvit";
 
 export function setupAuthGuard(router: Router): void {
     router.beforeEach((to) => {
@@ -22,6 +28,10 @@ export function setupAuthGuard(router: Router): void {
     });
 }
 
-export function installClientPlugins(_app: unknown, router: Router): void {
+export async function installClientPlugins(app: App, router: Router): Promise<void> {
     setupAuthGuard(router);
+    app.use(mecarvitPlugin);
+
+    await loadCurrentUser();
+    await loadCurrentCompany();
 }
