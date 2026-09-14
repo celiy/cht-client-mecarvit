@@ -109,7 +109,7 @@
                     <Popover
                         close-on-content-click
                         panel-class="p-0"
-                        class="py-4"
+                        class="pt-2 pb-4"
                     >
                         <template #button="{ toggle, isOpen }">
                             <Button
@@ -175,6 +175,8 @@
 
             <RouterView />
         </Sidebar>
+
+        <Toast position="bottom" />
     </main>
 </template>
 
@@ -184,6 +186,7 @@ import { useRouter } from "vue-router";
 import { clearAuthToken } from "@base/http";
 import { project } from "@base/project";
 import { clearMecarvitSession } from "../js/mecarvit";
+import Button from "@design/components/Button.vue";
 
 const router = useRouter();
 

@@ -91,23 +91,12 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import Button from "@design/components/Button.vue";
-import Card from "@design/components/Card.vue";
-import Input from "@design/components/Input.vue";
-import Select from "@design/components/Select.vue";
 import { HttpError } from "@base/http";
 import { validateLogin } from "@shared/validators/auth";
 import { completeAuth, type AuthApiResponse, type EmpresaLocal } from "../js/auth";
 
 export default defineComponent({
     name: "MecarvitLoginPage",
-
-    components: {
-        Button,
-        Card,
-        Input,
-        Select
-    },
 
     data() {
         return {
