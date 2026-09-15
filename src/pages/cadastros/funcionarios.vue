@@ -1,9 +1,19 @@
 <template>
-    <main class="container p-8">
+    <main class="container p-8 container-center">
         <h2 class="text-2xl font-semibold">Funcionários</h2>
 
         <div class="mt-4 mb-4">
-            <Button @click="onCreate"> Novo Funcionário </Button>
+            <div>
+                <Button label="Novo Funcionário" @click="onCreate"/>
+            </div>
+
+            <div>
+                <FilterInputs
+                    :filters="funcionarioFilters"
+
+                    @filters="onFilters"
+                />
+            </div>
         </div>
 
         <div>
@@ -74,8 +84,10 @@
 import { defineComponent } from "vue";
 import Button from "@design/components/Button.vue";
 import { HttpError } from "@base/http";
+import { toQueryString } from "@shared/frontend/queryString";
 import { PASSWORD_MIN_LENGTH } from "@shared/validators/password";
 import type { FormField } from "@shared/interfaces/FormField";
+import FilterInputs, { type FilterDef, type FilterValues } from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 
 type DialogMode = "view" | "edit" | "create";
@@ -160,12 +172,26 @@ export default defineComponent({
 
     components: {
         Button,
+        FilterInputs,
         ItemViewEdit
     },
 
     data() {
         return {
             filters: "",
+            funcionarioFilters: [
+                { type: "input", value: "nome", label: "Nome", default: true },
+                {
+                    type: "option",
+                    value: "ativo",
+                    label: "Status",
+                    options: [
+                        { label: "Ativo", value: "ativo", default: true },
+                        { label: "Inativo", value: "inativo" }
+                    ]
+                },
+                { type: "input", value: "cpf", label: "CPF" }
+            ] as FilterDef[],
             funcionarios: [] as UsuarioApi[],
             cargos: [] as CargoApi[],
             loadingFuncionarios: false,
@@ -288,7 +314,6 @@ export default defineComponent({
 
     mounted() {
         void this.getCargos();
-        void this.getFuncionarios();
     },
 
     methods: {
@@ -337,6 +362,11 @@ export default defineComponent({
             this.$toast.error(fallback);
         },
 
+        onFilters(values: FilterValues) {
+            this.filters = toQueryString(values);
+            void this.getFuncionarios();
+        },
+
         async getCargos() {
             try {
                 const response = await this.$http.get<ListResponse<CargoApi>>("/api/cargo", {
@@ -354,7 +384,7 @@ export default defineComponent({
                 this.loadingFuncionarios = true;
 
                 const response = await this.$http.get<ListResponse<UsuarioApi>>(
-                    "/api/usuario" + this.filters
+                    "/api/usuario" + (this.filters ? `?${this.filters}` : "")
                 );
 
                 this.funcionarios = response.data.data ?? [];
