@@ -51,14 +51,14 @@
             />
 
             <Pagination
-                id="funcionarios"
+                id="pagination-funcionarios"
                 :key="filters || 'all'"
 
                 class="mt-4"
 
                 :amount="pageCount"
                 :show-max="5"
-                :use-memo="false"
+                :use-memo="true"
 
                 @update:page="onPage"
             />
