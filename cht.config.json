@@ -1,7 +1,7 @@
 {
     "name": "mecarvit",
     "siteTitle": "Mecarvit",
-    "apiBaseUrl": "http://127.0.0.1:8000",
+    "apiBaseUrl": "http://127.0.0.1:3001",
     "frontend": {
         "repo": "https://github.com/celiy/cht-client-mecarvit.git"
     },
