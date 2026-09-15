@@ -42,6 +42,18 @@
                         required
                     />
 
+                    <Input
+                        id="change-senha-confirmacao"
+                        v-model="senhaConfirmacao"
+
+                        type="password"
+                        label="Confirmar senha"
+                        placeholder="Repita a nova senha"
+                        autocomplete="new-password"
+                        :error="errors.senhaConfirmacao"
+                        required
+                    />
+
                     <p
                         v-if="formError"
 
@@ -85,11 +97,13 @@ export default defineComponent({
         return {
             senhaAtual: "",
             senhaNova: "",
+            senhaConfirmacao: "",
             loading: false,
             formError: "",
             errors: {
                 senhaAtual: "",
-                senhaNova: ""
+                senhaNova: "",
+                senhaConfirmacao: ""
             }
         };
     },
@@ -109,6 +123,7 @@ export default defineComponent({
             this.formError = "";
             this.errors.senhaAtual = "";
             this.errors.senhaNova = "";
+            this.errors.senhaConfirmacao = "";
         },
 
         async loadMe() {
@@ -132,9 +147,13 @@ export default defineComponent({
                 senhaNova: this.senhaNova
             });
 
-            if (clientErrors) {
-                this.errors.senhaAtual = clientErrors.senhaAtual ?? "";
-                this.errors.senhaNova = clientErrors.senhaNova ?? "";
+            if (this.senhaNova !== this.senhaConfirmacao) {
+                this.errors.senhaConfirmacao = "As senhas não coincidem.";
+            }
+
+            if (clientErrors || this.errors.senhaConfirmacao) {
+                this.errors.senhaAtual = clientErrors?.senhaAtual ?? this.errors.senhaAtual;
+                this.errors.senhaNova = clientErrors?.senhaNova ?? this.errors.senhaNova;
                 this.formError = "Verifique os campos e tente novamente.";
                 return;
             }

@@ -71,6 +71,17 @@
                         required
                     />
 
+                    <Input
+                        id="register-senha-confirmacao"
+                        v-model="senhaConfirmacao"
+                        type="password"
+                        label="Confirmar senha"
+                        placeholder="Repita a senha"
+                        autocomplete="new-password"
+                        :error="errors.senhaConfirmacao"
+                        required
+                    />
+
                     <p
                         v-if="formError"
 
@@ -128,6 +139,7 @@ export default defineComponent({
             cpf: "",
             email: "",
             senha: "",
+            senhaConfirmacao: "",
             loading: false,
             formError: "",
             errors: {
@@ -135,7 +147,8 @@ export default defineComponent({
                 nome: "",
                 cpf: "",
                 email: "",
-                senha: ""
+                senha: "",
+                senhaConfirmacao: ""
             }
         };
     },
@@ -148,6 +161,7 @@ export default defineComponent({
             this.errors.cpf = "";
             this.errors.email = "";
             this.errors.senha = "";
+            this.errors.senhaConfirmacao = "";
         },
 
         applyFields(fields: Record<string, string> | undefined) {
@@ -176,8 +190,12 @@ export default defineComponent({
             };
             const clientErrors = validateCadastro(body);
 
-            if (clientErrors) {
-                this.applyFields(clientErrors);
+            if (this.senha !== this.senhaConfirmacao) {
+                this.errors.senhaConfirmacao = "As senhas não coincidem.";
+            }
+
+            if (clientErrors || this.errors.senhaConfirmacao) {
+                this.applyFields(clientErrors ?? undefined);
                 this.formError = "Verifique os campos e tente novamente.";
                 return;
             }

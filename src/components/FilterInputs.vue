@@ -1,40 +1,62 @@
 <template>
-    <div class="flex flex-wrap items-end gap-2">
-        <Input
-            v-for="filter in visibleInputFilters"
-            :id="`filter-${filter.value}`"
-            :key="filter.value"
+    <div class="flex items-start gap-2 h-fit">
+        <Button
+            class="p-2.5"
+            aria-label="Recarregar"
+            :class="{
+                'animate-spin': loading
+            }"
 
-            class="min-w-48 max-w-xs"
+            :disabled="loading"
 
-            floating-label
-            :type="inputTypeFor(filter)"
-            :label="filter.label"
-            :model-value="inputValues[filter.value] ?? ''"
+            @click="$emit('reload')"
 
-            @update:model-value="onInputValue(filter.value, $event)"
-        />
-
-        <Dropdown
-            hide-dropdown-arrow
-            show-checkmark
-            :close-on-select="false"
-            :min-width-px="180"
-            :options="dropdownOptions"
-            :is-option-selected="isFilterOptionSelected"
-
-            @click:value="onDropdownSelect"
         >
-            <template #button="{ toggle }">
+            <span class="fa-solid fa-rotate-right text-xs" />
+        </Button>
+
+        <div class="flex w-full justify-end gap-2 h-fit">
+            <div class="flex flex-wrap justify-end gap-2 h-fit">
+                <div v-for="filter in visibleInputFilters" :key="'div-' + filter.value" class="h-fit">
+                    <Input
+                        :id="`filter-${filter.value}`"
+                        :key="filter.value"
+
+                        class="min-w-48 max-w-xs"
+
+                        :type="inputTypeFor(filter)"
+                        :placeholder="filter.label"
+                        :model-value="inputValues[filter.value] ?? ''"
+
+                        @update:model-value="onInputValue(filter.value, $event)"
+                    />
+                </div>
+            </div>
+
+            <div class="relative h-fit w-fit">
                 <Button
-                    variant="secondary"
-                    left-icon="fa-filter"
+                    class="p-2.5"
                     aria-label="Filtros"
 
-                    @click="toggle"
+                    @click.stop="filtersOpen = !filtersOpen"
+                >
+                    <span class="fa-solid fa-filter text-xs" />
+                </Button>
+
+                <Dropdown
+                    v-model:open="filtersOpen"
+
+                    hide-dropdown-arrow
+                    show-checkmark
+                    :close-on-select="false"
+                    :min-width-px="180"
+                    :options="dropdownOptions"
+                    :is-option-selected="isFilterOptionSelected"
+
+                    @click:value="onDropdownSelect"
                 />
-            </template>
-        </Dropdown>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -104,16 +126,22 @@ export default defineComponent({
         filters: {
             type: Array as PropType<FilterDef[]>,
             required: true
+        },
+
+        loading: {
+            type: Boolean,
+            required: false
         }
     },
 
-    emits: ["filters"],
+    emits: ["filters", "reload"],
 
     data() {
         return {
             inputValues: {} as Record<string, string>,
             visibleInputKeys: [] as string[],
             optionSelections: {} as Record<string, string[]>,
+            filtersOpen: false,
             emitTimer: null as number | null
         };
     },
@@ -214,6 +242,27 @@ export default defineComponent({
             return "text";
         },
 
+        serializedInputValue(filter: FilterInputDef): string {
+            const raw = (this.inputValues[filter.value] ?? "").trim();
+
+            if (!raw) {
+                return "";
+            }
+
+            const inputType = this.inputTypeFor(filter);
+
+            if (
+                inputType === "cpf"
+                || inputType === "cnpj"
+                || inputType === "phone"
+                || inputType === "cep"
+            ) {
+                return raw.replace(/\D/g, "");
+            }
+
+            return raw;
+        },
+
         currentFilterValues(): FilterValues {
             const values: FilterValues = {};
 
@@ -223,7 +272,7 @@ export default defineComponent({
                         continue;
                     }
 
-                    const inputValue = (this.inputValues[filter.value] ?? "").trim();
+                    const inputValue = this.serializedInputValue(filter);
 
                     if (inputValue) {
                         values[filter.value] = inputValue;

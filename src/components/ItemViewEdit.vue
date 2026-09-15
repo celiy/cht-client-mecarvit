@@ -54,7 +54,7 @@
 
                             @click="cancel"
                         >
-                            Ok
+                            Fechar
                         </Button>
                     </template>
 
@@ -208,7 +208,8 @@ export default defineComponent({
             this.$emit("save", values);
         },
 
-        cancel() {
+        cancel(event?: Event) {
+            event?.stopImmediatePropagation();
             this.$emit("update:isOpen", false);
             this.$emit("cancel");
         },

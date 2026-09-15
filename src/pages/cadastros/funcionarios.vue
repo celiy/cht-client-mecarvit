@@ -1,19 +1,22 @@
 <template>
     <main class="container p-8 container-center">
-        <h2 class="text-2xl font-semibold">Funcionários</h2>
-
-        <div class="mt-4 mb-4">
-            <div>
-                <Button label="Novo Funcionário" @click="onCreate"/>
-            </div>
+        <div class="flex justify-between items-center">
+            <h2 class="text-2xl font-semibold">Funcionários</h2>
 
             <div>
-                <FilterInputs
-                    :filters="funcionarioFilters"
-
-                    @filters="onFilters"
-                />
+                <Button label="Cadastrar" left-icon="fa-plus" @click="onCreate"/>
             </div>
+        </div>
+
+
+        <div class="mt-2 mb-4">
+            <FilterInputs
+                :filters="funcionarioFilters"
+                :loading="loadingFuncionarios"
+
+                @filters="onFilters"
+                @reload="getFuncionarios"
+            />
         </div>
 
         <div>
@@ -45,6 +48,19 @@
                 :loading="loadingFuncionarios"
 
                 @click:action="onRowAction"
+            />
+
+            <Pagination
+                id="funcionarios"
+                :key="filters || 'all'"
+
+                class="mt-4"
+
+                :amount="pageCount"
+                :show-max="5"
+                :use-memo="false"
+
+                @update:page="onPage"
             />
         </div>
 
@@ -83,6 +99,7 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import Button from "@design/components/Button.vue";
+import Pagination from "@design/components/custom/Pagination.vue";
 import { HttpError } from "@base/http";
 import { toQueryString } from "@shared/frontend/queryString";
 import { PASSWORD_MIN_LENGTH } from "@shared/validators/password";
@@ -109,6 +126,9 @@ interface CargoApi {
 
 interface ListResponse<T> {
     data: T[];
+    page?: number;
+    limit?: number;
+    total?: number;
 }
 
 interface ItemResponse<T> {
@@ -173,7 +193,8 @@ export default defineComponent({
     components: {
         Button,
         FilterInputs,
-        ItemViewEdit
+        ItemViewEdit,
+        Pagination
     },
 
     data() {
@@ -203,7 +224,10 @@ export default defineComponent({
             cargoDialogOpen: false,
             cargoSaving: false,
             cargoItem: emptyCargoForm() as CargoFormValues,
-            cargoDialogKey: 0
+            cargoDialogKey: 0,
+            page: 1,
+            pageLimit: 10,
+            pageCount: 0
         };
     },
 
@@ -363,7 +387,17 @@ export default defineComponent({
         },
 
         onFilters(values: FilterValues) {
+            this.page = 1;
             this.filters = toQueryString(values);
+            void this.getFuncionarios();
+        },
+
+        onPage(page: number) {
+            if (page === this.page) {
+                return;
+            }
+
+            this.page = page;
             void this.getFuncionarios();
         },
 
@@ -383,14 +417,23 @@ export default defineComponent({
             try {
                 this.loadingFuncionarios = true;
 
+                const paging = toQueryString({
+                    page: this.page,
+                    limit: this.pageLimit
+                });
+                const query = [this.filters, paging].filter(Boolean).join("&");
                 const response = await this.$http.get<ListResponse<UsuarioApi>>(
-                    "/api/usuario" + (this.filters ? `?${this.filters}` : "")
+                    `/api/usuario?${query}`
                 );
+                const total = Number(response.data.total ?? 0);
+                const limit = Number(response.data.limit ?? this.pageLimit);
 
+                this.pageCount = limit > 0 ? Math.ceil(total / limit) : 0;
                 this.funcionarios = response.data.data ?? [];
             } catch (error) {
                 this.notifyError(error, "Não foi possível carregar os funcionários.");
                 this.funcionarios = [];
+                this.pageCount = 0;
             } finally {
                 this.loadingFuncionarios = false;
             }

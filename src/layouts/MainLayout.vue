@@ -11,7 +11,8 @@
                 {
                     type: 'link',
                     label: 'Dashboard',
-                    link: '/home'
+                    link: '/home',
+                    leftIcon: 'fa-house'
                 },
 
                 {
@@ -21,6 +22,7 @@
                 {
                     type: 'group',
                     label: 'Funcionários',
+                    leftIcon: 'fa-users',
                     links: [
                         {
                             label: 'Gerenciar',
@@ -31,6 +33,7 @@
                 {
                     type: 'group',
                     label: 'Clientes',
+                    leftIcon: 'fa-user',
                     links: [
                         {
                             label: 'Gerenciar',
@@ -38,13 +41,15 @@
                         },
                         {
                             label: 'Cadastrar',
-                            link: '/clientes?cadastrar=true'
+                            link: '/clientes?cadastrar=true',
+                            leftIcon: 'fa-plus'
                         }
                     ]
                 },
                 {
                     type: 'group',
                     label: 'Veículos',
+                    leftIcon: 'fa-car',
                     links: [
                         {
                             label: 'Gerenciar',
@@ -60,6 +65,7 @@
                 {
                     type: 'group',
                     label: 'Ordens de serviço',
+                    leftIcon: 'fa-wrench',
                     openByDefault: true,
                     links: [
                         {
@@ -68,7 +74,8 @@
                         },
                         {
                             label: 'Cadastrar',
-                            link: '/ordem-servico?cadastrar=true'
+                            link: '/ordem-servico?cadastrar=true',
+                            leftIcon: 'fa-plus'
                         }
                     ]
                 },
@@ -80,6 +87,7 @@
                 {
                     type: 'group',
                     label: 'Entradas e saídas',
+                    leftIcon: 'fa-money-bill',
                     openByDefault: true,
                     links: [
                         {
@@ -96,7 +104,8 @@
                         },
                         {
                             label: 'Cadastrar',
-                            link: '/registro-entrada-saida?cadastrar=true'
+                            link: '/registro-entrada-saida?cadastrar=true',
+                            leftIcon: 'fa-plus'
                         }
                     ]
                 }
