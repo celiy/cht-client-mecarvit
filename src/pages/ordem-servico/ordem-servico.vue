@@ -21,6 +21,7 @@
         @delete="onDelete"
     >
         <Modal
+            ref="osModal"
             :is-open="dialogOpen"
             size="extra-large"
 
@@ -117,7 +118,8 @@ import OrdemServicoForm, {
     type OrdemServicoFormValues,
     type VeiculoSelectOption
 } from "../../components/OrdemServicoForm.vue";
-import { clienteNomeSocialForSave } from "../../js/entityFields";
+import { clienteNomeSocialForSave, optionalTextForSave } from "../../js/entityFields";
+import { digitsOnly } from "@shared/validators/mecarvit";
 import { formatDateInputValue } from "@shared/format/dateTime";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
 import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
@@ -251,6 +253,10 @@ type OsFormExpose = {
     applyFieldErrors: (errors: Record<string, string>) => void;
     setFieldValue: (fieldId: string, value: unknown) => void;
     getFieldValue: (fieldId: string) => unknown;
+};
+
+type OsModalExpose = {
+    scrollBodyToTop: () => void;
 };
 
 export default defineComponent({
@@ -476,6 +482,16 @@ export default defineComponent({
             return this.$refs.osForm as OsFormExpose | undefined;
         },
 
+        osModalRef(): OsModalExpose | undefined {
+            return this.$refs.osModal as OsModalExpose | undefined;
+        },
+
+        scrollOsDialogToTop() {
+            void this.$nextTick(() => {
+                this.osModalRef()?.scrollBodyToTop();
+            });
+        },
+
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
@@ -680,6 +696,8 @@ export default defineComponent({
                     String(entry.id)
                 );
             }
+
+            this.scrollOsDialogToTop();
         },
 
         onCreate() {
@@ -1077,20 +1095,31 @@ export default defineComponent({
 
         async syncClienteCelIfNeeded(documento: string, cel: string): Promise<void> {
             const doc = documentDigits(documento);
-            const nextCel = String(cel ?? "").trim();
-            const cliente =
-                this.formClientes.find((item) => item.documento === doc) ||
-                this.clientes.find((item) => item.documento === doc);
-            const prevCel = String(cliente?.cel ?? "").trim();
+            const nextDigits = digitsOnly(String(cel ?? ""));
 
-            if (nextCel === prevCel) {
+            let prevDigits = "";
+
+            try {
+                const response = await this.$http.get<ItemResponse<ClienteApi>>(
+                    `/api/cliente/${doc}`
+                );
+                prevDigits = digitsOnly(String(response.data.data?.cel ?? ""));
+            } catch {
+                const cliente =
+                    this.formClientes.find((item) => item.documento === doc) ||
+                    this.clientes.find((item) => item.documento === doc);
+
+                prevDigits = digitsOnly(String(cliente?.cel ?? ""));
+            }
+
+            if (nextDigits === prevDigits) {
                 return;
             }
 
             const response = await this.$http.patch<ItemResponse<ClienteApi>>(
                 `/api/cliente/${doc}`,
                 {
-                    cel: nextCel || undefined
+                    cel: nextDigits ? nextDigits : null
                 }
             );
             const updated = response.data.data;
@@ -1140,6 +1169,67 @@ export default defineComponent({
             return created.id;
         },
 
+        async syncVeiculoFieldsIfNeeded(
+            veiculoId: number,
+            payload: OrdemServicoFormValues
+        ): Promise<void> {
+            const id = Number(veiculoId);
+
+            if (!Number.isInteger(id) || id <= 0) {
+                return;
+            }
+
+            const veiculo =
+                this.formVeiculos.find((item) => item.id === id) ||
+                this.veiculos.find((item) => item.id === id);
+
+            const nextTipo = String(payload.veiculoTipo ?? "").trim();
+            const prevTipo = String(veiculo?.tipo ?? "").trim();
+
+            const kmRaw = payload.veiculoKilometragem.trim();
+            let nextKm: number | null = null;
+
+            if (kmRaw !== "") {
+                const parsed = Number(kmRaw);
+
+                if (Number.isFinite(parsed)) {
+                    nextKm = parsed;
+                }
+            }
+
+            const prevKm = veiculo?.kilometragem ?? null;
+
+            const patch: Record<string, string | number | null> = {};
+
+            if (nextTipo !== prevTipo) {
+                patch.tipo = nextTipo ? nextTipo : null;
+            }
+
+            if (nextKm !== prevKm) {
+                patch.kilometragem = nextKm;
+            }
+
+            if (Object.keys(patch).length === 0) {
+                return;
+            }
+
+            const response = await this.$http.patch<ItemResponse<VeiculoApi>>(
+                `/api/veiculo/${id}`,
+                patch
+            );
+            const updated = response.data.data;
+
+            if (!updated) {
+                return;
+            }
+
+            const merge = (list: VeiculoApi[]): VeiculoApi[] =>
+                list.map((item) => (item.id === id ? { ...item, ...updated } : item));
+
+            this.veiculos = merge(this.veiculos);
+            this.formVeiculos = merge(this.formVeiculos);
+        },
+
         async onSave(payload: OrdemServicoFormValues) {
             this.dialogSaving = true;
 
@@ -1150,15 +1240,21 @@ export default defineComponent({
 
                 const veiculoId = await this.resolveVeiculoId(payload, clienteDocumento);
 
+                if (this.dialogMode !== "create") {
+                    await this.syncVeiculoFieldsIfNeeded(veiculoId, payload);
+                }
+
+                const isCreate = this.dialogMode === "create";
+
                 const body: Record<string, unknown> = {
                     clienteDocumento,
                     veiculoId,
                     statusOsId: Number(payload.statusOsId),
-                    diagnosticoCliente: payload.diagnosticoCliente || undefined,
-                    diagnosticoMecanico: payload.diagnosticoMecanico || undefined,
-                    obs: payload.obs || undefined,
-                    dataInicio: payload.dataInicio || undefined,
-                    dataConclusao: payload.dataConclusao || undefined,
+                    diagnosticoCliente: optionalTextForSave(payload.diagnosticoCliente, isCreate),
+                    diagnosticoMecanico: optionalTextForSave(payload.diagnosticoMecanico, isCreate),
+                    obs: optionalTextForSave(payload.obs, isCreate),
+                    dataInicio: optionalTextForSave(payload.dataInicio, isCreate),
+                    dataConclusao: optionalTextForSave(payload.dataConclusao, isCreate),
                     itens: this.itensPayload(payload.itens)
                 };
 

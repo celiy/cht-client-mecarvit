@@ -9,6 +9,7 @@
         pagination-id="pagination-veiculos"
         :pagination-key="filters || 'all'"
         delete-name-field="modelo"
+        :filter-select-options="filterSelectOptions"
 
         @create="onCreate"
         @filters="onFilters"
@@ -16,6 +17,7 @@
         @page="onPage"
         @action="onRowAction"
         @delete="onDelete"
+        @search:external="onFilterSearch"
     >
         <ItemViewEdit
             ref="itemDialog"
@@ -128,20 +130,6 @@ export default defineComponent({
     data() {
         return {
             filters: "",
-            veiculoFilters: [
-                { type: "input", value: "modelo", label: "Modelo", default: true },
-                { type: "input", value: "placa", label: "Placa" },
-                {
-                    type: "option",
-                    value: "ativo",
-                    label: "Status",
-                    options: [
-                        { label: "Todos", value: "ativo,inativo", default: true },
-                        { label: "Ativo", value: "ativo" },
-                        { label: "Inativo", value: "inativo" }
-                    ]
-                }
-            ] as FilterDef[],
             tableHeaders: [
                 { label: "Modelo", field: "modelo", position: "start" },
                 { label: "Placa", field: "placa", position: "start" },
@@ -150,6 +138,8 @@ export default defineComponent({
             veiculos: [] as VeiculoApi[],
             clientes: [] as ClienteApi[],
             formClientes: [] as ClienteApi[],
+            filterClienteOptions: [] as Array<{ label: string; value: string }>,
+            filterClienteSearchSeq: 0,
             loadingVeiculos: false,
             dialogOpen: false,
             dialogSaving: false,
@@ -164,6 +154,36 @@ export default defineComponent({
     },
 
     computed: {
+        veiculoFilters(): FilterDef[] {
+            return [
+                {
+                    type: "select",
+                    value: "clienteDocumento",
+                    label: "Cliente",
+                    default: true,
+                    search: { external: true, field: "nome" }
+                },
+                { type: "input", value: "modelo", label: "Modelo" },
+                { type: "input", value: "placa", label: "Placa" },
+                {
+                    type: "option",
+                    value: "ativo",
+                    label: "Status",
+                    options: [
+                        { label: "Todos", value: "ativo,inativo", default: true },
+                        { label: "Ativo", value: "ativo" },
+                        { label: "Inativo", value: "inativo" }
+                    ]
+                }
+            ];
+        },
+
+        filterSelectOptions(): Record<string, Array<{ label: string; value: string }>> {
+            return {
+                clienteDocumento: this.filterClienteOptions
+            };
+        },
+
         clienteNameByDocumento(): Record<string, string> {
             const map: Record<string, string> = {};
 
@@ -186,7 +206,7 @@ export default defineComponent({
 
         clienteOptions() {
             return this.formClientes.map((cliente) => ({
-                label: `${cliente.nome} · ${cliente.documento}`,
+                label: cliente.nome,
                 value: cliente.documento
             }));
         },
@@ -226,6 +246,51 @@ export default defineComponent({
             this.page = 1;
             this.filters = toQueryString(values);
             void this.getVeiculos();
+        },
+
+        onFilterSearch(payload: { filterKey: string; field: string; value: string }) {
+            if (payload.filterKey === "clienteDocumento") {
+                void this.searchFilterClientes(payload.value, payload.field || "nome");
+            }
+        },
+
+        async searchFilterClientes(query: string, field: string) {
+            this.filterClienteSearchSeq += 1;
+            const seq = this.filterClienteSearchSeq;
+
+            try {
+                const trimmed = query.trim();
+                const searchQuery = toQueryString({
+                    limit: 100,
+                    ativo: "ativo,inativo",
+                    ...(trimmed && field ? { [field]: trimmed } : {})
+                });
+                const response = await this.$http.get<ListResponse<ClienteApi>>(
+                    `/api/cliente?${searchQuery}`
+                );
+
+                if (seq !== this.filterClienteSearchSeq) {
+                    return;
+                }
+
+                this.filterClienteOptions = (response.data.data ?? []).map((cliente) => ({
+                    label: cliente.nome,
+                    value: cliente.documento
+                }));
+            } catch {
+                if (seq !== this.filterClienteSearchSeq) {
+                    return;
+                }
+
+                this.filterClienteOptions = [];
+            }
+        },
+
+        syncFilterClienteOptionsFromList(clientes: ClienteApi[]) {
+            this.filterClienteOptions = clientes.map((cliente) => ({
+                label: cliente.nome,
+                value: cliente.documento
+            }));
         },
 
         onPage(page: number) {
@@ -275,6 +340,7 @@ export default defineComponent({
 
                 if (!trimmed) {
                     this.clientes = results;
+                    this.syncFilterClienteOptionsFromList(results);
                 }
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os clientes.");
@@ -398,7 +464,6 @@ export default defineComponent({
                 const body = {
                     modelo: payload.modelo,
                     placa: payload.placa,
-                    tipo: payload.tipo || undefined,
                     clienteDocumento: documentDigits(payload.clienteDocumento),
                     ...veiculoOptionalFields(payload, {
                         clearEmpty: this.dialogMode !== "create"

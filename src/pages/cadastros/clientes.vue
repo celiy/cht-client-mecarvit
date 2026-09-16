@@ -79,6 +79,8 @@ import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vu
 import {
     clienteFormFields,
     clienteNomeSocialForSave,
+    optionalTextForSave,
+    optionalPhoneForSave,
     enderecoFormFields,
     veiculoFormFields,
     emptyVeiculoFormExtras,
@@ -316,6 +318,7 @@ export default defineComponent({
             return clienteFormFields({
                 isCreate: this.dialogMode === "create",
                 isView: this.dialogMode === "view",
+                documento: this.dialogItem.documento,
                 enderecoOptions: this.enderecoOptions,
                 veiculoOptions: this.veiculoOptions,
                 includeVehicles: true
@@ -989,7 +992,6 @@ export default defineComponent({
                         {
                             modelo,
                             placa,
-                            tipo: tipo || undefined,
                             ativo: Boolean(payload.ativo),
                             clienteDocumento: documentDigits(this.dialogItem.documento),
                             ...optional
@@ -1065,9 +1067,9 @@ export default defineComponent({
                             payload.nomeSocial,
                             true
                         ),
-                        email: payload.email || undefined,
-                        cel: payload.cel || undefined,
-                        obs: payload.obs || undefined,
+                        email: optionalTextForSave(payload.email, true),
+                        cel: optionalPhoneForSave(payload.cel, true),
+                        obs: optionalTextForSave(payload.obs, true),
                         enderecoIds,
                         veiculos: this.pendingVeiculos
                             .filter((veiculo) => selectedVeiculoIds.includes(veiculo.id))
@@ -1092,9 +1094,9 @@ export default defineComponent({
                     await this.$http.put(`/api/cliente/${documento}`, {
                         nome: payload.nome,
                         nomeSocial: clienteNomeSocialForSave(documento, payload.nomeSocial, false),
-                        email: payload.email || undefined,
-                        cel: payload.cel || undefined,
-                        obs: payload.obs || undefined,
+                        email: optionalTextForSave(payload.email, false),
+                        cel: optionalPhoneForSave(payload.cel, false),
+                        obs: optionalTextForSave(payload.obs, false),
                         ativo: Boolean(payload.ativo),
                         enderecoIds
                     });

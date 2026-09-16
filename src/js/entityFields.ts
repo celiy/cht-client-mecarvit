@@ -1,3 +1,4 @@
+import { digitsOnly } from "@shared/validators/mecarvit";
 import type { FormField } from "@shared/interfaces/FormField";
 import { isCnpjDocument } from "@shared/validators/documents";
 
@@ -26,15 +27,27 @@ export function enderecoFormFields(): FormField[] {
 export function clienteFormFields(options: {
     isCreate: boolean;
     isView: boolean;
+    documento?: string;
     veiculoOptions: SelectOption[];
     enderecoOptions?: SelectOption[];
     includeVehicles: boolean;
 }): FormField[] {
+    const documentoDigitsValue = digitsOnly(String(options.documento ?? ""));
+    let documentoType: FormField["type"] = "text";
+
+    if (!options.isCreate) {
+        if (documentoDigitsValue.length === 14 || isCnpjDocument(documentoDigitsValue)) {
+            documentoType = "cnpj";
+        } else if (documentoDigitsValue.length === 11) {
+            documentoType = "cpf";
+        }
+    }
+
     const fields: FormField[] = [
         {
             id: "documento",
             label: "Documento",
-            type: "text",
+            type: documentoType,
             required: true,
             readonly: !options.isCreate,
             helperText: options.isCreate ? "CPF ou CNPJ" : undefined
@@ -133,6 +146,28 @@ export function clienteNomeSocialForSave(
 
     if (text) {
         return text;
+    }
+
+    return isCreate ? undefined : null;
+}
+
+/** Optional text on update: empty clears with `null`; on create empty omits the key. */
+export function optionalTextForSave(value: unknown, isCreate: boolean): string | null | undefined {
+    const text = String(value ?? "").trim();
+
+    if (text) {
+        return text;
+    }
+
+    return isCreate ? undefined : null;
+}
+
+/** Phone on update: digits only; empty clears with `null`. */
+export function optionalPhoneForSave(value: unknown, isCreate: boolean): string | null | undefined {
+    const digits = digitsOnly(String(value ?? ""));
+
+    if (digits) {
+        return digits;
     }
 
     return isCreate ? undefined : null;
@@ -283,21 +318,25 @@ export function veiculoOptionalFields(
         chassi?: unknown;
         kilometragem?: unknown;
         dataTrocaOleo?: unknown;
+        tipo?: unknown;
     },
     options: { clearEmpty: boolean }
 ): {
     chassi?: string | null;
     kilometragem?: number | null;
     dataTrocaOleo?: string | null;
+    tipo?: string | null;
 } {
     const result: {
         chassi?: string | null;
         kilometragem?: number | null;
         dataTrocaOleo?: string | null;
+        tipo?: string | null;
     } = {};
 
     const chassi = String(payload.chassi ?? "").trim();
     const data = String(payload.dataTrocaOleo ?? "").trim();
+    const tipo = String(payload.tipo ?? "").trim();
     const kmRaw = payload.kilometragem;
     const kmEmpty = kmRaw === undefined || kmRaw === null || String(kmRaw).trim() === "";
 
@@ -321,6 +360,12 @@ export function veiculoOptionalFields(
         result.dataTrocaOleo = data;
     } else if (options.clearEmpty) {
         result.dataTrocaOleo = null;
+    }
+
+    if (tipo) {
+        result.tipo = tipo;
+    } else if (options.clearEmpty) {
+        result.tipo = null;
     }
 
     return result;
