@@ -27,6 +27,11 @@
                         {
                             label: 'Gerenciar',
                             link: '/funcionarios'
+                        },
+                        {
+                            label: 'Cadastrar',
+                            link: '/funcionarios?cadastrar=true',
+                            leftIcon: 'fa-plus'
                         }
                     ]
                 },
@@ -54,6 +59,11 @@
                         {
                             label: 'Gerenciar',
                             link: '/veiculos'
+                        },
+                        {
+                            label: 'Cadastrar',
+                            link: '/veiculos?cadastrar=true',
+                            leftIcon: 'fa-plus'
                         }
                     ]
                 },

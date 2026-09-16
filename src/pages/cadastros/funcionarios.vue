@@ -1,69 +1,22 @@
 <template>
-    <main class="container p-8 container-center">
-        <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-semibold">Funcionários</h2>
+    <CrudListPage
+        title="Funcionários"
+        :filters="funcionarioFilters"
+        :loading="loadingFuncionarios"
+        :headers="tableHeaders"
+        :rows="tableRows"
+        :page-count="pageCount"
+        pagination-id="pagination-funcionarios"
+        :pagination-key="filters || 'all'"
+        delete-name-field="nome"
 
-            <div>
-                <Button label="Cadastrar" left-icon="fa-plus" @click="onCreate"/>
-            </div>
-        </div>
-
-
-        <div class="mt-2 mb-4">
-            <FilterInputs
-                :filters="funcionarioFilters"
-                :loading="loadingFuncionarios"
-
-                @filters="onFilters"
-                @reload="getFuncionarios"
-            />
-        </div>
-
-        <div>
-            <Table
-                :headers="[
-                    {
-                        label: 'Nome',
-                        field: 'nome',
-                        position: 'start'
-                    },
-                    {
-                        label: 'Cargo',
-                        field: 'cargoNome',
-                        position: 'start'
-                    },
-                    {
-                        label: 'CPF',
-                        field: 'cpf',
-                        position: 'start'
-                    }
-                ]"
-                :actions="[
-                    { label: 'Visualizar', value: 'inspect', icon: 'fa-eye' },
-                    { label: 'Editar', value: 'edit', icon: 'fa-pen' },
-                    { separator: true },
-                    { label: 'Excluir', value: 'delete', icon: 'fa-trash', variant: 'destructive' }
-                ]"
-                :data="funcionarios"
-                :loading="loadingFuncionarios"
-
-                @click:action="onRowAction"
-            />
-
-            <Pagination
-                id="pagination-funcionarios"
-                :key="filters || 'all'"
-
-                class="mt-4"
-
-                :amount="pageCount"
-                :show-max="5"
-                :use-memo="true"
-
-                @update:page="onPage"
-            />
-        </div>
-
+        @create="onCreate"
+        @filters="onFilters"
+        @reload="getFuncionarios"
+        @page="onPage"
+        @action="onRowAction"
+        @delete="onDelete"
+    >
         <ItemViewEdit
             ref="itemDialog"
             v-model:is-open="dialogOpen"
@@ -77,6 +30,7 @@
             @save="onSave"
             @cancel="closeDialog"
             @click:select-action="onUsuarioSelectAction"
+            @search:external="onSearchExternal"
         />
 
         <ItemViewEdit
@@ -93,21 +47,29 @@
             @save="onSaveCargo"
             @cancel="closeCargoDialog"
         />
-    </main>
+    </CrudListPage>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import Button from "@design/components/Button.vue";
-import Pagination from "@design/components/custom/Pagination.vue";
-import { HttpError } from "@base/http";
+import type { FormField } from "@shared/interfaces/FormField";
 import { toQueryString } from "@shared/frontend/queryString";
 import { PASSWORD_MIN_LENGTH } from "@shared/validators/password";
-import type { FormField } from "@shared/interfaces/FormField";
-import FilterInputs, { type FilterDef, type FilterValues } from "../../components/FilterInputs.vue";
+import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
-
-type DialogMode = "view" | "edit" | "create";
+import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
+import {
+    ATIVO_FILTER_OPTIONS,
+    documentDigits,
+    listQuery,
+    notifyHttpError,
+    pageCountFromTotal,
+    withSelectedItem,
+    type DialogMode,
+    type ItemResponse,
+    type ItemViewEditExpose,
+    type ListResponse
+} from "../../js/crudHttp";
 
 interface UsuarioApi {
     cpf: string;
@@ -124,17 +86,6 @@ interface CargoApi {
     nivelAcesso?: string;
 }
 
-interface ListResponse<T> {
-    data: T[];
-    page?: number;
-    limit?: number;
-    total?: number;
-}
-
-interface ItemResponse<T> {
-    data: T;
-}
-
 interface FuncionarioFormValues {
     nome: string;
     email: string;
@@ -147,15 +98,6 @@ interface FuncionarioFormValues {
 interface CargoFormValues {
     nome: string;
     nivelAcesso: string[];
-}
-
-type ItemViewEditExpose = {
-    applyFieldErrors: (errors: Record<string, string>) => void;
-    setFieldValue: (fieldId: string, value: unknown) => void;
-};
-
-function cpfDigits(value: unknown): string {
-    return String(value ?? "").replace(/\D/g, "");
 }
 
 function emptyCargoForm(): CargoFormValues {
@@ -191,10 +133,8 @@ export default defineComponent({
     name: "MecarvitFuncionariosPage",
 
     components: {
-        Button,
-        FilterInputs,
-        ItemViewEdit,
-        Pagination
+        CrudListPage,
+        ItemViewEdit
     },
 
     data() {
@@ -206,13 +146,15 @@ export default defineComponent({
                     type: "option",
                     value: "ativo",
                     label: "Status",
-                    options: [
-                        { label: "Ativo", value: "ativo", default: true },
-                        { label: "Inativo", value: "inativo" }
-                    ]
+                    options: ATIVO_FILTER_OPTIONS
                 },
                 { type: "input", value: "cpf", label: "CPF" }
             ] as FilterDef[],
+            tableHeaders: [
+                { label: "Nome", field: "nome", position: "start" },
+                { label: "Cargo", field: "cargoNome", position: "start" },
+                { label: "CPF", field: "cpf", position: "start" }
+            ] as TableHeader[],
             funcionarios: [] as UsuarioApi[],
             cargos: [] as CargoApi[],
             loadingFuncionarios: false,
@@ -225,6 +167,7 @@ export default defineComponent({
             cargoSaving: false,
             cargoItem: emptyCargoForm() as CargoFormValues,
             cargoDialogKey: 0,
+            cargoSearchSeq: 0,
             page: 1,
             pageLimit: 10,
             pageCount: 0
@@ -232,6 +175,10 @@ export default defineComponent({
     },
 
     computed: {
+        tableRows() {
+            return this.funcionarios as unknown as Array<Record<string, unknown>>;
+        },
+
         dialogHeader(): string {
             if (this.dialogMode === "create") {
                 return "Novo funcionário";
@@ -288,11 +235,16 @@ export default defineComponent({
                 type: "select",
                 required: true,
                 options: this.cargoOptions,
+                selectSearch: {
+                    external: true,
+                    field: "nome"
+                },
                 selectAction: this.dialogMode === "view"
                     ? undefined
                     : {
                         icon: "fa-plus",
-                        side: "right"
+                        side: "right",
+                        tooltip: "Cadastrar cargo"
                     }
             });
 
@@ -360,32 +312,6 @@ export default defineComponent({
             this.cargoSaving = false;
         },
 
-        fieldErrorsFromHttp(error: HttpError): Record<string, string> {
-            const fields: Record<string, string> = {};
-
-            if (!error.fields) {
-                return fields;
-            }
-
-            for (const [key, value] of Object.entries(error.fields)) {
-                if (typeof value === "string") {
-                    fields[key] = value;
-                }
-            }
-
-            return fields;
-        },
-
-        notifyError(error: unknown, fallback: string, dialog?: ItemViewEditExpose) {
-            if (error instanceof HttpError) {
-                this.$toast.error(error.message);
-                dialog?.applyFieldErrors(this.fieldErrorsFromHttp(error));
-                return;
-            }
-
-            this.$toast.error(fallback);
-        },
-
         onFilters(values: FilterValues) {
             this.page = 1;
             this.filters = toQueryString(values);
@@ -401,15 +327,36 @@ export default defineComponent({
             void this.getFuncionarios();
         },
 
-        async getCargos() {
-            try {
-                const response = await this.$http.get<ListResponse<CargoApi>>("/api/cargo", {
-                    params: { limit: 100 }
-                });
+        async getCargos(query = "", field = "nome") {
+            this.cargoSearchSeq += 1;
+            const seq = this.cargoSearchSeq;
 
-                this.cargos = response.data.data ?? [];
+            try {
+                const trimmed = query.trim();
+                const searchQuery = toQueryString({
+                    limit: 100,
+                    ...(trimmed && field ? { [field]: trimmed } : {})
+                });
+                const response = await this.$http.get<ListResponse<CargoApi>>(
+                    `/api/cargo?${searchQuery}`
+                );
+
+                if (seq !== this.cargoSearchSeq) {
+                    return;
+                }
+
+                const selectedId = String(
+                    this.itemDialog()?.getFieldValue("cargoId") ?? this.dialogItem.cargoId ?? ""
+                );
+                const selected = this.cargos.find((cargo) => String(cargo.id) === selectedId);
+
+                this.cargos = withSelectedItem(
+                    response.data.data ?? [],
+                    selected,
+                    (cargo) => String(cargo.id)
+                );
             } catch (error) {
-                this.notifyError(error, "Não foi possível carregar os cargos.");
+                notifyHttpError(this.$toast, error, "Não foi possível carregar os cargos.");
             }
         },
 
@@ -417,21 +364,19 @@ export default defineComponent({
             try {
                 this.loadingFuncionarios = true;
 
-                const paging = toQueryString({
-                    page: this.page,
-                    limit: this.pageLimit
-                });
-                const query = [this.filters, paging].filter(Boolean).join("&");
+                const query = listQuery(this.filters, this.page, this.pageLimit);
                 const response = await this.$http.get<ListResponse<UsuarioApi>>(
                     `/api/usuario?${query}`
                 );
-                const total = Number(response.data.total ?? 0);
-                const limit = Number(response.data.limit ?? this.pageLimit);
 
-                this.pageCount = limit > 0 ? Math.ceil(total / limit) : 0;
+                this.pageCount = pageCountFromTotal(
+                    response.data.total,
+                    response.data.limit,
+                    this.pageLimit
+                );
                 this.funcionarios = response.data.data ?? [];
             } catch (error) {
-                this.notifyError(error, "Não foi possível carregar os funcionários.");
+                notifyHttpError(this.$toast, error, "Não foi possível carregar os funcionários.");
                 this.funcionarios = [];
                 this.pageCount = 0;
             } finally {
@@ -439,12 +384,20 @@ export default defineComponent({
             }
         },
 
-        openDialog(mode: DialogMode, item: FuncionarioFormValues) {
+        openDialog(mode: DialogMode, item: FuncionarioFormValues, cargo?: CargoApi) {
             this.dialogKey += 1;
             this.dialogMode = mode;
             this.dialogItem = item;
             this.dialogSaving = false;
             this.dialogOpen = true;
+
+            if (cargo) {
+                this.cargos = withSelectedItem(
+                    this.cargos,
+                    cargo,
+                    (entry) => String(entry.id)
+                );
+            }
         },
 
         onCreate() {
@@ -452,7 +405,7 @@ export default defineComponent({
         },
 
         async openUsuarioDialog(mode: "view" | "edit", row: Record<string, unknown>) {
-            const cpf = cpfDigits(row.cpf);
+            const cpf = documentDigits(row.cpf);
 
             if (!cpf) {
                 this.$toast.error("CPF do funcionário é inválido.");
@@ -464,10 +417,16 @@ export default defineComponent({
                     `/api/usuario/${cpf}`
                 );
                 const user = response.data.data;
+                const cargo = user.cargoId != null
+                    ? {
+                        id: user.cargoId,
+                        nome: user.cargoNome ?? String(user.cargoId)
+                    }
+                    : undefined;
 
-                this.openDialog(mode, toFormValues(user));
+                this.openDialog(mode, toFormValues(user), cargo);
             } catch (error) {
-                this.notifyError(error, "Não foi possível carregar o funcionário.");
+                notifyHttpError(this.$toast, error, "Não foi possível carregar o funcionário.");
             }
         },
 
@@ -476,9 +435,11 @@ export default defineComponent({
                 void this.openUsuarioDialog("view", item);
             } else if (value === "edit") {
                 void this.openUsuarioDialog("edit", item);
-            } else if (value === "delete") {
-                this.$toast.info("Exclusão de funcionário não está disponível.");
             }
+        },
+
+        onDelete() {
+            this.$toast.info("Exclusão de funcionário não está disponível.");
         },
 
         onUsuarioSelectAction(payload: { id: string }) {
@@ -494,6 +455,14 @@ export default defineComponent({
             this.cargoItem = emptyCargoForm();
             this.cargoSaving = false;
             this.cargoDialogOpen = true;
+        },
+
+        onSearchExternal(payload: { id: string; field: string; value: string }) {
+            if (payload.id !== "cargoId") {
+                return;
+            }
+
+            void this.getCargos(payload.value, payload.field || "nome");
         },
 
         nivelAcessoFromPayload(value: unknown): string {
@@ -531,7 +500,8 @@ export default defineComponent({
                 this.closeCargoDialog();
                 this.$toast.success("Cargo criado.");
             } catch (error) {
-                this.notifyError(
+                notifyHttpError(
+                    this.$toast,
                     error,
                     "Não foi possível criar o cargo.",
                     this.cargoDialogRef()
@@ -556,7 +526,7 @@ export default defineComponent({
 
                     this.$toast.success("Funcionário criado.");
                 } else {
-                    const cpf = cpfDigits(this.dialogItem.cpf);
+                    const cpf = documentDigits(this.dialogItem.cpf);
 
                     await this.$http.put(`/api/usuario/${cpf}`, {
                         nome: payload.nome,
@@ -571,7 +541,8 @@ export default defineComponent({
                 this.closeDialog();
                 await this.getFuncionarios();
             } catch (error) {
-                this.notifyError(
+                notifyHttpError(
+                    this.$toast,
                     error,
                     "Não foi possível salvar o funcionário.",
                     this.itemDialog()

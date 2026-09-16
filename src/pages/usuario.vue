@@ -1,11 +1,5 @@
 <template>
-    <main class="flex max-w-2xl flex-col gap-6 p-8">
-        <section>
-            <h1 class="text-2xl font-semibold">Perfil</h1>
-
-            <p class="mt-2 text-muted-foreground!">Dados da conta autenticada.</p>
-        </section>
-
+    <main class="p-8">
         <Card v-if="$mecarvit.user">
             <template #header>
                 <h2 class="text-lg font-semibold">{{ $mecarvit.user.nome }}</h2>

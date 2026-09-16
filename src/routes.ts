@@ -12,6 +12,11 @@ import VeiculosPage from "./pages/cadastros/veiculos.vue";
 import OrdemServicoPage from "./pages/ordem-servico/ordem-servico.vue";
 import EntradasSaidasPage from "./pages/financeiro/entradas-saidas.vue";
 import UsuarioPage from "./pages/usuario.vue";
+import NotFoundPage from "@design/components/custom/NotFoundPage.vue";
+
+const notFoundProps = {
+    homeHref: "/home"
+};
 
 const routes: RouteRecordRaw[] = [
     {
@@ -56,8 +61,20 @@ const routes: RouteRecordRaw[] = [
                 path: "registro-entrada-saida",
                 name: "registro-entrada-saida",
                 component: EntradasSaidasPage
+            },
+            {
+                path: ":pathMatch(.*)*",
+                name: "not-found",
+                component: NotFoundPage,
+                props: notFoundProps
             }
         ]
+    },
+    {
+        path: "/:pathMatch(.*)*",
+        name: "not-found-public",
+        component: NotFoundPage,
+        props: notFoundProps
     }
 ];
 

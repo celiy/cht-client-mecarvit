@@ -20,9 +20,13 @@
                 :values="item"
                 :readonly="isView"
                 :section-columns="sectionColumns"
+                :submit-disabled="submitDisabled"
 
                 @submit="onFormSubmit"
                 @click:select-action="onSelectAction"
+                @click:select-option="onSelectOption"
+                @click:select-remove="onSelectRemove"
+                @search:external="onSearchExternal"
             >
                 <template
                     v-if="$slots.formActions"
@@ -37,6 +41,11 @@
                     />
                 </template>
             </FormRenderer>
+
+            <slot
+                name="belowForm"
+                :is-view="isView"
+            />
         </template>
 
         <template #footer>
@@ -64,7 +73,7 @@
                             type="submit"
 
                             :form="formId"
-                            :disabled="saving"
+                            :disabled="saving || submitDisabled"
                         >
                             Salvar
                         </Button>
@@ -72,7 +81,7 @@
                         <Button
                             variant="secondary"
                             type="button"
-                            :disabled="saving"
+                            :disabled="saving || submitDisabled"
 
                             @click="cancel"
                         >
@@ -96,6 +105,7 @@ type ItemMode = "view" | "edit" | "create";
             submitForm: () => void;
             applyFieldErrors: (errors: Record<string, string>) => void;
             setFieldValue: (fieldId: string, value: unknown) => void;
+            getFieldValue: (fieldId: string) => unknown;
         };
 
 interface FormSection {
@@ -153,6 +163,11 @@ export default defineComponent({
             default: false
         },
 
+        submitDisabled: {
+            type: Boolean,
+            default: false
+        },
+
         size: {
             type: String as PropType<"small" | "medium" | "large">,
             default: "medium"
@@ -171,7 +186,15 @@ export default defineComponent({
         }
     },
 
-    emits: ["save", "cancel", "update:isOpen", "click:select-action"],
+    emits: [
+        "save",
+        "cancel",
+        "update:isOpen",
+        "click:select-action",
+        "click:select-option",
+        "click:select-remove",
+        "search:external"
+    ],
 
     computed: {
         isView(): boolean {
@@ -188,10 +211,6 @@ export default defineComponent({
             return this.$refs.formRenderer as FormRendererExpose | undefined;
         },
 
-        requestSave() {
-            this.formRendererInstance()?.submitForm();
-        },
-
         applyFieldErrors(errors: Record<string, string>) {
             this.formRendererInstance()?.applyFieldErrors(errors);
         },
@@ -200,12 +219,40 @@ export default defineComponent({
             this.formRendererInstance()?.setFieldValue(fieldId, value);
         },
 
+        getFieldValue(fieldId: string): unknown {
+            return this.formRendererInstance()?.getFieldValue(fieldId);
+        },
+
         onSelectAction(payload: { id: string; field: FormField }) {
             this.$emit("click:select-action", payload);
         },
 
+        onSelectOption(payload: { id: string; value: string; field: FormField }) {
+            this.$emit("click:select-option", payload);
+        },
+
+        onSelectRemove(payload: { id: string; value: string; field: FormField }) {
+            this.$emit("click:select-remove", payload);
+        },
+
+        onSearchExternal(payload: { id: string; field: string; value: string }) {
+            this.$emit("search:external", payload);
+        },
+
         onFormSubmit(values: Record<string, unknown>) {
+            if (this.submitDisabled) {
+                return;
+            }
+
             this.$emit("save", values);
+        },
+
+        requestSave() {
+            if (this.submitDisabled) {
+                return;
+            }
+
+            this.formRendererInstance()?.submitForm();
         },
 
         cancel(event?: Event) {
