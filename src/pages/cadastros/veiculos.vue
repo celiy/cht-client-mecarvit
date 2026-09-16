@@ -65,6 +65,8 @@ interface ClienteApi {
 
 interface VeiculoApi {
     id: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     modelo: string;
     placa: string;
     tipo?: string | null;
@@ -78,6 +80,8 @@ interface VeiculoApi {
 
 interface VeiculoFormValues {
     id?: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     modelo: string;
     placa: string;
     tipo: string;
@@ -102,6 +106,8 @@ function emptyVeiculoForm(): VeiculoFormValues {
 function toVeiculoForm(veiculo: VeiculoApi): VeiculoFormValues {
     return {
         id: veiculo.id,
+        criadoEm: veiculo.criadoEm ?? "",
+        modificadoEm: veiculo.modificadoEm ?? "",
         modelo: veiculo.modelo ?? "",
         placa: veiculo.placa ?? "",
         tipo: veiculo.tipo ?? "",

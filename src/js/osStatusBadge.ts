@@ -9,11 +9,11 @@ export type OsStatusBadge = {
 
 /** Tailwind palette tokens (e.g. sky-500) — classes must stay literal for the compiler. */
 const COLOR_BY_STATUS_ID: Record<number, string> = {
-    1: "sky-500",
-    2: "amber-500",
+    1: "info",
+    2: "warning",
     3: "blue-500",
-    4: "green-500",
-    5: "red-500"
+    4: "success",
+    5: "destructive"
 };
 
 const DEFAULT_COLOR = "slate-500";

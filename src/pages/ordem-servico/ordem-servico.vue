@@ -42,26 +42,15 @@
                     :veiculo-options="veiculoSelectOptions"
                     :status-options="statusSelectOptions"
                     :servico-suggestions="servicoSuggestions"
+                    :pagamentos-button-label="dialogPagamentosButtonLabel"
+                    :pagamentos="dialogPagamentos"
 
                     @submit="onSave"
-                    @click:cliente-action="onClienteAction"
-                    @click:veiculo-action="onVeiculoAction"
                     @search:external="onSearchExternal"
                     @search:servico="onSearchServicos"
                     @change:cliente="onClienteChange"
+                    @click:pagamentos="openDialogOsPagamentos"
                 />
-
-                <div class="mt-4">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="small"
-                        left-icon="fa-money-bill"
-                        :label="dialogPagamentosButtonLabel"
-
-                        @click="openDialogOsPagamentos"
-                    />
-                </div>
             </template>
 
             <template #footer>
@@ -101,38 +90,6 @@
             </template>
         </Modal>
 
-        <ItemViewEdit
-            ref="clienteDialog"
-
-            v-model:is-open="clienteDialogOpen"
-            header="Novo cliente"
-            mode="create"
-            size="small"
-            :item="clienteItem"
-            :fields="nestedClienteFields"
-            :saving="clienteSaving"
-            :form-key="clienteDialogKey"
-
-            @save="onSaveCliente"
-            @cancel="closeClienteDialog"
-        />
-
-        <ItemViewEdit
-            ref="veiculoDialog"
-
-            v-model:is-open="veiculoDialogOpen"
-            header="Novo veículo"
-            mode="create"
-            size="small"
-            :item="veiculoItem"
-            :fields="nestedVeiculoFields"
-            :saving="veiculoSaving"
-            :form-key="veiculoDialogKey"
-
-            @save="onSaveVeiculo"
-            @cancel="closeVeiculoDialog"
-        />
-
         <PagamentosModal
             v-model:is-open="paymentModalOpen"
             :saving="paymentSaving"
@@ -154,17 +111,13 @@ import Button from "@design/components/Button.vue";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import PagamentosModal from "../../components/PagamentosModal.vue";
 import type { PagamentoFormRow } from "../../js/pagamentoOptions";
-import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
 import OrdemServicoForm, {
+    emptyOrdemServicoFormValues,
     type OrdemServicoFormValues,
     type VeiculoSelectOption
 } from "../../components/OrdemServicoForm.vue";
-import {
-    clienteFormFields,
-    clienteNomeSocialForSave,
-    veiculoFormFields
-} from "../../js/entityFields";
+import { clienteNomeSocialForSave } from "../../js/entityFields";
 import { formatDateInputValue } from "@shared/format/dateTime";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
 import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
@@ -178,7 +131,6 @@ import {
     withSelectedItem,
     type DialogMode,
     type ItemResponse,
-    type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
 import { formatTableLabel } from "../../js/formatTableLabel";
@@ -187,12 +139,15 @@ import { osStatusBadge } from "../../js/osStatusBadge";
 interface ClienteApi {
     documento: string;
     nome: string;
+    cel?: string | null;
 }
 
 interface VeiculoApi {
     id: number;
     modelo: string;
     placa: string;
+    tipo?: string | null;
+    kilometragem?: number | null;
     clienteDocumento: string;
 }
 
@@ -219,6 +174,8 @@ interface OrdemServicoItemApi {
 
 interface OrdemServicoApi {
     id: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     clienteDocumento: string;
     veiculoId: number;
     diagnosticoCliente?: string | null;
@@ -253,56 +210,40 @@ function mapItensFromApi(itens: OrdemServicoItemApi[] | undefined): OrdemServico
 }
 
 function emptyOsForm(defaultStatusId = "1"): OrdemServicoFormValues {
-    return {
-        clienteDocumento: "",
-        veiculoId: "",
-        statusOsId: defaultStatusId,
-        dataInicio: formatDateInputValue(new Date()),
-        dataConclusao: "",
-        diagnosticoCliente: "",
-        diagnosticoMecanico: "",
-        obs: "",
-        itens: []
-    };
+    return emptyOrdemServicoFormValues({
+        defaultStatusId,
+        dataInicioToday: true
+    });
 }
 
-function toOsForm(os: OrdemServicoApi): OrdemServicoFormValues {
+function toOsForm(
+    os: OrdemServicoApi,
+    cliente?: ClienteApi,
+    veiculo?: VeiculoApi
+): OrdemServicoFormValues {
     return {
         id: os.id,
         clienteDocumento: os.clienteDocumento ?? "",
+        clienteNome: cliente?.nome ?? "",
+        clienteCpfNovo: "",
+        clienteCel: cliente?.cel ?? "",
         veiculoId: os.veiculoId != null ? String(os.veiculoId) : "",
+        veiculoModelo: veiculo?.modelo ?? "",
+        veiculoPlaca: veiculo?.placa ?? "",
+        veiculoKilometragem:
+            veiculo?.kilometragem != null && veiculo.kilometragem !== 0
+                ? String(veiculo.kilometragem)
+                : "",
+        veiculoTipo: veiculo?.tipo ?? "",
         statusOsId: os.statusOsId != null ? String(os.statusOsId) : "1",
         dataInicio: formatDateInputValue(os.dataInicio),
         dataConclusao: formatDateInputValue(os.dataConclusao),
         diagnosticoCliente: os.diagnosticoCliente ?? "",
         diagnosticoMecanico: os.diagnosticoMecanico ?? "",
         obs: os.obs ?? "",
-        itens: mapItensFromApi(os.itens)
-    };
-}
-
-function emptyVeiculoForm(clienteDocumento = "") {
-    return {
-        clienteDocumento,
-        modelo: "",
-        placa: "",
-        tipo: "",
-        chassi: "",
-        kilometragem: "",
-        dataTrocaOleo: ""
-    };
-}
-
-function emptyClienteForm() {
-    return {
-        documento: "",
-        nome: "",
-        nomeSocial: "",
-        email: "",
-        cel: "",
-        obs: "",
-        ativo: true,
-        veiculoId: ""
+        itens: mapItensFromApi(os.itens),
+        criadoEm: os.criadoEm ?? "",
+        modificadoEm: os.modificadoEm ?? ""
     };
 }
 
@@ -318,7 +259,6 @@ export default defineComponent({
     components: {
         Button,
         CrudListPage,
-        ItemViewEdit,
         PagamentosModal,
         OrdemServicoForm
     },
@@ -340,7 +280,11 @@ export default defineComponent({
                 { label: "OS", field: "idLabel", position: "start" },
                 { label: "Cliente", field: "clienteNome", position: "start" },
                 { label: "Veículo", field: "veiculoLabel", position: "start" },
-                { label: "Status", field: "statusBadge", position: "center" }
+                {
+                    label: "Status",
+                    field: "statusBadge",
+                    position: "center"
+                }
             ] as TableHeader[],
             ordens: [] as OrdemServicoApi[],
             clientes: [] as ClienteApi[],
@@ -354,14 +298,6 @@ export default defineComponent({
             dialogMode: "view" as DialogMode,
             dialogItem: emptyOsForm("1") as OrdemServicoFormValues,
             dialogKey: 0,
-            clienteDialogOpen: false,
-            clienteSaving: false,
-            clienteItem: emptyClienteForm(),
-            clienteDialogKey: 0,
-            veiculoDialogOpen: false,
-            veiculoSaving: false,
-            veiculoItem: emptyVeiculoForm(),
-            veiculoDialogKey: 0,
             clienteSearchSeq: 0,
             veiculoSearchSeq: 0,
             servicoSearchSeq: 0,
@@ -471,8 +407,9 @@ export default defineComponent({
 
         clienteOptions() {
             return this.formClientes.map((cliente) => ({
-                label: `${cliente.nome} · ${cliente.documento}`,
-                value: cliente.documento
+                label: cliente.nome,
+                value: cliente.documento,
+                cel: cliente.cel ?? ""
             }));
         },
 
@@ -480,7 +417,14 @@ export default defineComponent({
             return this.formVeiculos.map((veiculo) => ({
                 label: `${veiculo.modelo} · ${veiculo.placa}`,
                 value: String(veiculo.id),
-                clienteDocumento: veiculo.clienteDocumento
+                clienteDocumento: veiculo.clienteDocumento,
+                modelo: veiculo.modelo,
+                placa: veiculo.placa,
+                kilometragem:
+                    veiculo.kilometragem != null && veiculo.kilometragem !== 0
+                        ? String(veiculo.kilometragem)
+                        : "",
+                tipo: veiculo.tipo ?? ""
             }));
         },
 
@@ -515,23 +459,6 @@ export default defineComponent({
             return "Ordem de serviço";
         },
 
-        nestedClienteFields() {
-            return clienteFormFields({
-                isCreate: true,
-                isView: false,
-                veiculoOptions: [],
-                includeVehicles: false
-            });
-        },
-
-        nestedVeiculoFields() {
-            return veiculoFormFields({
-                isCreate: true,
-                clienteOptions: this.clienteOptions,
-                showCliente: false
-            });
-        },
-
         filterSelectOptions(): Record<string, Array<{ label: string; value: string }>> {
             return {
                 cliente: this.filterClienteOptions,
@@ -549,34 +476,14 @@ export default defineComponent({
             return this.$refs.osForm as OsFormExpose | undefined;
         },
 
-        clienteDialogRef(): ItemViewEditExpose | undefined {
-            return this.$refs.clienteDialog as ItemViewEditExpose | undefined;
-        },
-
-        veiculoDialogRef(): ItemViewEditExpose | undefined {
-            return this.$refs.veiculoDialog as ItemViewEditExpose | undefined;
-        },
-
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
             this.dialogPagamentos = [];
-            this.closeClienteDialog();
-            this.closeVeiculoDialog();
-        },
-
-        closeClienteDialog() {
-            this.clienteDialogOpen = false;
-            this.clienteSaving = false;
         },
 
         onDialogOpenChange(open: boolean) {
             this.dialogOpen = open;
-
-            if (!open) {
-                this.closeClienteDialog();
-                this.closeVeiculoDialog();
-            }
         },
 
         onFilters(values: FilterValues) {
@@ -628,7 +535,7 @@ export default defineComponent({
 
         syncFilterSelectOptionsFromLookups() {
             this.filterClienteOptions = this.clientes.map((cliente) => ({
-                label: `${cliente.nome} · ${cliente.documento}`,
+                label: cliente.nome,
                 value: cliente.documento
             }));
             this.filterVeiculoOptions = this.veiculos.map((veiculo) => ({
@@ -668,7 +575,7 @@ export default defineComponent({
                 }
 
                 this.filterClienteOptions = (response.data.data ?? []).map((cliente) => ({
-                    label: `${cliente.nome} · ${cliente.documento}`,
+                    label: cliente.nome,
                     value: cliente.documento
                 }));
             } catch {
@@ -798,10 +705,16 @@ export default defineComponent({
                 );
 
                 const os = response.data.data;
+                const cliente =
+                    this.clientes.find((entry) => entry.documento === os.clienteDocumento) ??
+                    this.formClientes.find((entry) => entry.documento === os.clienteDocumento);
+                const veiculo =
+                    this.veiculos.find((entry) => entry.id === os.veiculoId) ??
+                    this.formVeiculos.find((entry) => entry.id === os.veiculoId);
 
                 this.openDialog(
                     mode,
-                    toOsForm(os),
+                    toOsForm(os, cliente, veiculo),
                     (os.pagamentos ?? []).map((row) => ({
                         id: row.id,
                         tipo: row.tipo,
@@ -862,7 +775,13 @@ export default defineComponent({
         },
 
         mapPagamentosToFormRows(
-            pagamentos: Array<{ id?: number; tipo: string; valor: number; criadoEm?: string; modificadoEm?: string }>
+            pagamentos: Array<{
+                id?: number;
+                tipo: string;
+                valor: number;
+                criadoEm?: string;
+                modificadoEm?: string;
+            }>
         ): PagamentoFormRow[] {
             return pagamentos.map((row) => ({
                 id: row.id,
@@ -873,7 +792,9 @@ export default defineComponent({
             }));
         },
 
-        pagamentosPayload(rows: PagamentoFormRow[]): Array<{ id?: number; tipo: string; valor: number }> {
+        pagamentosPayload(
+            rows: PagamentoFormRow[]
+        ): Array<{ id?: number; tipo: string; valor: number }> {
             return rows.map((row) => ({
                 ...(row.id != null ? { id: row.id } : {}),
                 tipo: row.tipo,
@@ -971,40 +892,6 @@ export default defineComponent({
             }
         },
 
-        onClienteAction() {
-            if (this.dialogMode === "view") {
-                return;
-            }
-
-            this.clienteDialogKey += 1;
-            this.clienteItem = emptyClienteForm();
-            this.clienteSaving = false;
-            this.clienteDialogOpen = true;
-        },
-
-        closeVeiculoDialog() {
-            this.veiculoDialogOpen = false;
-            this.veiculoSaving = false;
-        },
-
-        onVeiculoAction() {
-            if (this.dialogMode === "view") {
-                return;
-            }
-
-            const documento = this.currentClienteDocumento();
-
-            if (!documento) {
-                this.$toast.error("Selecione um cliente antes de cadastrar o veículo.");
-                return;
-            }
-
-            this.veiculoDialogKey += 1;
-            this.veiculoItem = emptyVeiculoForm(documento);
-            this.veiculoSaving = false;
-            this.veiculoDialogOpen = true;
-        },
-
         async onSearchServicos(query: string) {
             this.servicoSearchSeq += 1;
             const seq = this.servicoSearchSeq;
@@ -1035,52 +922,6 @@ export default defineComponent({
                 }
 
                 this.servicoSuggestions = [];
-            }
-        },
-
-        async onSaveVeiculo(payload: Record<string, unknown>) {
-            this.veiculoSaving = true;
-
-            try {
-                const documento = documentDigits(
-                    payload.clienteDocumento ?? this.currentClienteDocumento()
-                );
-                const response = await this.$http.post<ItemResponse<VeiculoApi>>("/api/veiculo", {
-                    clienteDocumento: documento,
-                    modelo: payload.modelo,
-                    placa: payload.placa,
-                    tipo: payload.tipo || undefined,
-                    chassi: payload.chassi || undefined,
-                    kilometragem:
-                        payload.kilometragem === "" || payload.kilometragem == null
-                            ? undefined
-                            : Number(payload.kilometragem),
-                    dataTrocaOleo: payload.dataTrocaOleo || undefined
-                });
-                const created = response.data.data;
-
-                if (!created) {
-                    this.$toast.error("Não foi possível criar o veículo.");
-                    return;
-                }
-
-                this.veiculos = [...this.veiculos, created];
-                this.formVeiculos = withSelectedItem(this.formVeiculos, created, (veiculo) =>
-                    String(veiculo.id)
-                );
-                await this.$nextTick();
-                this.osFormRef()?.setFieldValue("veiculoId", String(created.id));
-                this.closeVeiculoDialog();
-                this.$toast.success("Veículo criado.");
-            } catch (error) {
-                notifyHttpError(
-                    this.$toast,
-                    error,
-                    "Não foi possível criar o veículo.",
-                    this.veiculoDialogRef()
-                );
-            } finally {
-                this.veiculoSaving = false;
             }
         },
 
@@ -1200,59 +1041,118 @@ export default defineComponent({
             }
         },
 
-        async onSaveCliente(payload: Record<string, unknown>) {
-            this.clienteSaving = true;
+        async resolveClienteDocumento(payload: OrdemServicoFormValues): Promise<string> {
+            const existing = documentDigits(payload.clienteDocumento);
 
-            try {
-                const response = await this.$http.post<ItemResponse<ClienteApi>>("/api/cliente", {
-                    documento: payload.documento,
-                    nome: payload.nome,
-                    nomeSocial: clienteNomeSocialForSave(
-                        payload.documento,
-                        payload.nomeSocial,
-                        true
-                    ),
-                    email: payload.email || undefined,
-                    cel: payload.cel || undefined,
-                    obs: payload.obs || undefined
-                });
-                const created = response.data.data;
-
-                if (!created) {
-                    this.$toast.error("Não foi possível criar o cliente.");
-                    return;
-                }
-
-                this.clientes = [...this.clientes, created];
-                this.formClientes = withSelectedItem(
-                    this.formClientes,
-                    created,
-                    (cliente) => cliente.documento
-                );
-                await this.$nextTick();
-                this.osFormRef()?.setFieldValue("clienteDocumento", created.documento);
-                this.closeClienteDialog();
-                this.$toast.success("Cliente criado.");
-                void this.searchFormVeiculos("", "modelo", created.documento);
-            } catch (error) {
-                notifyHttpError(
-                    this.$toast,
-                    error,
-                    "Não foi possível criar o cliente.",
-                    this.clienteDialogRef()
-                );
-            } finally {
-                this.clienteSaving = false;
+            if (existing) {
+                return existing;
             }
+
+            const nome = payload.clienteNome.trim();
+            const documento = documentDigits(payload.clienteCpfNovo);
+
+            const cel = String(payload.clienteCel ?? "").trim();
+
+            const response = await this.$http.post<ItemResponse<ClienteApi>>("/api/cliente", {
+                documento,
+                nome,
+                nomeSocial: clienteNomeSocialForSave(documento, "", true),
+                cel: cel || undefined
+            });
+            const created = response.data.data;
+
+            if (!created?.documento) {
+                throw new Error("Cliente não criado");
+            }
+
+            this.clientes = [...this.clientes, created];
+            this.formClientes = withSelectedItem(
+                this.formClientes,
+                created,
+                (cliente) => cliente.documento
+            );
+
+            return documentDigits(created.documento);
+        },
+
+        async syncClienteCelIfNeeded(documento: string, cel: string): Promise<void> {
+            const doc = documentDigits(documento);
+            const nextCel = String(cel ?? "").trim();
+            const cliente =
+                this.formClientes.find((item) => item.documento === doc) ||
+                this.clientes.find((item) => item.documento === doc);
+            const prevCel = String(cliente?.cel ?? "").trim();
+
+            if (nextCel === prevCel) {
+                return;
+            }
+
+            const response = await this.$http.patch<ItemResponse<ClienteApi>>(
+                `/api/cliente/${doc}`,
+                {
+                    cel: nextCel || undefined
+                }
+            );
+            const updated = response.data.data;
+
+            if (!updated) {
+                return;
+            }
+
+            const mergeCel = (list: ClienteApi[]): ClienteApi[] =>
+                list.map((item) =>
+                    item.documento === doc ? { ...item, cel: updated.cel ?? null } : item
+                );
+
+            this.clientes = mergeCel(this.clientes);
+            this.formClientes = mergeCel(this.formClientes);
+        },
+
+        async resolveVeiculoId(
+            payload: OrdemServicoFormValues,
+            clienteDocumento: string
+        ): Promise<number> {
+            const existingId = Number(payload.veiculoId);
+
+            if (Number.isInteger(existingId) && existingId > 0) {
+                return existingId;
+            }
+
+            const kilometragemRaw = payload.veiculoKilometragem.trim();
+            const response = await this.$http.post<ItemResponse<VeiculoApi>>("/api/veiculo", {
+                clienteDocumento,
+                modelo: payload.veiculoModelo.trim(),
+                placa: payload.veiculoPlaca.trim(),
+                tipo: payload.veiculoTipo.trim() || undefined,
+                kilometragem: kilometragemRaw === "" ? undefined : Number(kilometragemRaw)
+            });
+            const created = response.data.data;
+
+            if (!created?.id) {
+                throw new Error("Veículo não criado");
+            }
+
+            this.veiculos = [...this.veiculos, created];
+            this.formVeiculos = withSelectedItem(this.formVeiculos, created, (veiculo) =>
+                String(veiculo.id)
+            );
+
+            return created.id;
         },
 
         async onSave(payload: OrdemServicoFormValues) {
             this.dialogSaving = true;
 
             try {
+                const clienteDocumento = await this.resolveClienteDocumento(payload);
+
+                await this.syncClienteCelIfNeeded(clienteDocumento, payload.clienteCel);
+
+                const veiculoId = await this.resolveVeiculoId(payload, clienteDocumento);
+
                 const body: Record<string, unknown> = {
-                    clienteDocumento: documentDigits(payload.clienteDocumento),
-                    veiculoId: Number(payload.veiculoId),
+                    clienteDocumento,
+                    veiculoId,
                     statusOsId: Number(payload.statusOsId),
                     diagnosticoCliente: payload.diagnosticoCliente || undefined,
                     diagnosticoMecanico: payload.diagnosticoMecanico || undefined,

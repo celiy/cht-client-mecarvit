@@ -1,20 +1,27 @@
 <template>
     <section class="flex flex-col gap-3">
-        <h4 class="text-sm font-semibold text-foreground">
-            Serviços
-        </h4>
+        <h4 class="text-sm font-semibold text-foreground">Serviços</h4>
 
         <div
             v-for="(row, index) in lockedRows"
             :key="`locked-${index}-${row.servicoId ?? row.servicoNome}`"
 
-            class="flex flex-wrap items-center justify-between gap-2 rounded border border-border px-3 py-2 text-sm"
+            class="flex flex-wrap items-center justify-between gap-2 rounded border px-3 py-2 text-sm"
         >
-            <small class="min-w-0 flex-1">
+            <small class="flex min-w-0 flex-1 flex-row flex-wrap">
                 <b>{{ row.servicoNome }}</b>
-                · qtd {{ row.quantidade }}
-                · obra {{ formatMoneyBrl(parseMoneyInput(row.valorObra) ?? 0) }}
-                · peças {{ formatMoneyBrl(parseMoneyInput(row.valorPecas) ?? 0) }}
+
+                <span>
+                    · Quantidade: <b>{{ row.quantidade }}</b>
+                </span>
+
+                <span :class="{ 'text-muted-foreground!': !row.valorObra }">
+                    · Obra: <b>{{ formatMoneyBrl(parseMoneyInput(row.valorObra) ?? 0) }}</b>
+                </span>
+
+                <span :class="{ 'text-muted-foreground!': !row.valorPecas }">
+                    · Peças: <b>{{ formatMoneyBrl(parseMoneyInput(row.valorPecas) ?? 0) }}</b>
+                </span>
             </small>
 
             <div
@@ -142,7 +149,10 @@ import { defineComponent, type PropType } from "vue";
 import Button from "@design/components/Button.vue";
 import Input from "@design/components/Input.vue";
 import Select from "@design/components/Select.vue";
-import type { OptionItem, SearchExternalPayload } from "@design/components/internal/OptionsList.vue";
+import type {
+    OptionItem,
+    SearchExternalPayload
+} from "@design/components/internal/OptionsList.vue";
 import { parseMoneyInput } from "@shared/format/moneyInput";
 import { formatMoneyBrl } from "../js/crudHttp";
 

@@ -42,6 +42,15 @@
                 </template>
             </FormRenderer>
 
+            <CriadoModificadoFields
+                v-if="isView"
+
+                class="mt-4"
+                :id-prefix="formId"
+                :criado-em="item.criadoEm"
+                :modificado-em="item.modificadoEm"
+            />
+
             <slot
                 name="belowForm"
                 :is-view="isView"
@@ -98,6 +107,7 @@
 import { defineComponent, type PropType } from "vue";
 import FormRenderer from "@design/components/form/FormRenderer.vue";
 import type { FormField } from "@shared/interfaces/FormField";
+import CriadoModificadoFields from "./CriadoModificadoFields.vue";
 
 type ItemMode = "view" | "edit" | "create";
 
@@ -118,6 +128,7 @@ export default defineComponent({
     name: "ItemViewEdit",
 
     components: {
+        CriadoModificadoFields,
         FormRenderer
     },
 

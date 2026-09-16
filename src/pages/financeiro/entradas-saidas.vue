@@ -148,7 +148,7 @@
 
         <Modal
             :is-open="osDialogOpen"
-            size="medium"
+            size="extra-large"
 
             @update:value="onOsDialogOpenChange"
         >
@@ -158,6 +158,7 @@
 
             <template #body>
                 <OrdemServicoForm
+                    v-if="osDialogOpen"
                     :key="osDialogKey"
 
                     :form-id="osFormId"
@@ -165,6 +166,7 @@
                     :values="osDialogItem"
                     :cliente-options="osClienteOptions"
                     :veiculo-options="osVeiculoSelectOptions"
+                    :pagamentos="osDialogPagamentos"
                 />
             </template>
 
@@ -205,9 +207,13 @@ import FilterInputs from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
 import OrdemServicoForm, {
+    emptyOrdemServicoFormValues,
+    mergeOrdemServicoFormValues,
     type OrdemServicoFormValues,
     type VeiculoSelectOption
 } from "../../components/OrdemServicoForm.vue";
+import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
+import { formatDateInputValue } from "@shared/format/dateTime";
 import { formatTableLabel } from "../../js/formatTableLabel";
 import { registroFormFields } from "../../js/entityFields";
 import PagamentosModal from "../../components/PagamentosModal.vue";
@@ -241,6 +247,8 @@ interface PagamentoApi {
 
 interface RegistroApi {
     id: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     tipo: string;
     nome: string;
     valor: number;
@@ -252,6 +260,7 @@ interface RegistroApi {
 interface ClienteApi {
     documento: string;
     nome: string;
+    cel?: string | null;
 }
 
 interface VeiculoApi {
@@ -259,18 +268,51 @@ interface VeiculoApi {
     modelo: string;
     placa: string;
     clienteDocumento: string;
+    tipo?: string | null;
+    kilometragem?: number | null;
+}
+
+interface OrdemServicoItemApi {
+    servicoId: number;
+    servicoNome?: string;
+    quantidade: number;
+    valorObra: number;
+    valorPecas?: number | null;
 }
 
 interface OrdemServicoApi {
     id: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     clienteDocumento: string;
     veiculoId: number;
+    statusOsId?: number;
+    dataInicio?: string | null;
+    dataConclusao?: string | null;
     diagnosticoCliente?: string | null;
+    diagnosticoMecanico?: string | null;
     obs?: string | null;
+    itens?: OrdemServicoItemApi[];
+    pagamentos?: PagamentoApi[];
+}
+
+function mapOsItensFromApi(itens: OrdemServicoItemApi[] | undefined): OrdemServicoItemFormRow[] {
+    return (itens ?? []).map((item) => ({
+        servicoId: item.servicoId,
+        servicoNome: item.servicoNome ?? "",
+        quantidade: String(item.quantidade),
+        valorObra: moneyAmountToInputDigits(item.valorObra),
+        valorPecas:
+            item.valorPecas != null && item.valorPecas !== 0
+                ? moneyAmountToInputDigits(item.valorPecas)
+                : ""
+    }));
 }
 
 interface RegistroFormValues {
     id?: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     tipo: string;
     nome: string;
     valor: string;
@@ -294,6 +336,8 @@ function emptyRegistroForm(tipo = ""): RegistroFormValues {
 function toRegistroForm(registro: RegistroApi): RegistroFormValues {
     return {
         id: registro.id,
+        criadoEm: registro.criadoEm ?? "",
+        modificadoEm: registro.modificadoEm ?? "",
         tipo: registro.tipo ?? "",
         nome: registro.nome ?? "",
         valor: registro.valor == null ? "" : moneyAmountToInputDigits(Number(registro.valor)),
@@ -302,18 +346,35 @@ function toRegistroForm(registro: RegistroApi): RegistroFormValues {
     };
 }
 
-function toOsForm(os: OrdemServicoApi): OrdemServicoFormValues {
+function toOsForm(
+    os: OrdemServicoApi,
+    cliente?: ClienteApi,
+    veiculo?: VeiculoApi
+): OrdemServicoFormValues {
     return {
+        ...emptyOrdemServicoFormValues({
+            defaultStatusId: os.statusOsId != null ? String(os.statusOsId) : "1"
+        }),
         id: os.id,
+        criadoEm: os.criadoEm ?? "",
+        modificadoEm: os.modificadoEm ?? "",
         clienteDocumento: os.clienteDocumento ?? "",
+        clienteNome: cliente?.nome ?? "",
+        clienteCel: cliente?.cel != null ? String(cliente.cel) : "",
         veiculoId: os.veiculoId != null ? String(os.veiculoId) : "",
-        statusOsId: "1",
-        dataInicio: "",
-        dataConclusao: "",
+        veiculoModelo: veiculo?.modelo ?? "",
+        veiculoPlaca: veiculo?.placa ?? "",
+        veiculoKilometragem:
+            veiculo?.kilometragem != null && veiculo.kilometragem !== 0
+                ? String(veiculo.kilometragem)
+                : "",
+        veiculoTipo: veiculo?.tipo ?? "",
+        dataInicio: formatDateInputValue(os.dataInicio),
+        dataConclusao: formatDateInputValue(os.dataConclusao),
         diagnosticoCliente: os.diagnosticoCliente ?? "",
-        diagnosticoMecanico: "",
+        diagnosticoMecanico: os.diagnosticoMecanico ?? "",
         obs: os.obs ?? "",
-        itens: []
+        itens: mapOsItensFromApi(os.itens)
     };
 }
 
@@ -376,12 +437,8 @@ export default defineComponent({
             osDialogOpen: false,
             osDialogKey: 0,
             osFormId: "entrada-saida-os-form",
-            osDialogItem: {
-                clienteDocumento: "",
-                veiculoId: "",
-                diagnosticoCliente: "",
-                obs: ""
-            } as OrdemServicoFormValues,
+            osDialogItem: emptyOrdemServicoFormValues(),
+            osDialogPagamentos: [] as PagamentoFormRow[],
             osClientes: [] as ClienteApi[],
             osVeiculos: [] as VeiculoApi[],
             dialogPagamentos: [] as PagamentoFormRow[],
@@ -498,7 +555,14 @@ export default defineComponent({
             return this.osVeiculos.map((veiculo) => ({
                 label: `${veiculo.modelo} · ${veiculo.placa}`,
                 value: String(veiculo.id),
-                clienteDocumento: veiculo.clienteDocumento
+                clienteDocumento: veiculo.clienteDocumento,
+                modelo: veiculo.modelo,
+                placa: veiculo.placa,
+                kilometragem:
+                    veiculo.kilometragem != null && veiculo.kilometragem !== 0
+                        ? String(veiculo.kilometragem)
+                        : "",
+                tipo: veiculo.tipo ?? ""
             }));
         }
     },
@@ -693,7 +757,13 @@ export default defineComponent({
         },
 
         mapPagamentosToFormRows(
-            pagamentos: Array<{ id?: number; tipo: string; valor: number; criadoEm?: string; modificadoEm?: string }>
+            pagamentos: Array<{
+                id?: number;
+                tipo: string;
+                valor: number;
+                criadoEm?: string;
+                modificadoEm?: string;
+            }>
         ): PagamentoFormRow[] {
             return pagamentos.map((row) => ({
                 id: row.id,
@@ -704,7 +774,9 @@ export default defineComponent({
             }));
         },
 
-        async onSavePagamentosModal(pagamentos: Array<{ id?: number; tipo: string; valor: number }>) {
+        async onSavePagamentosModal(
+            pagamentos: Array<{ id?: number; tipo: string; valor: number }>
+        ) {
             const target = this.paymentTarget;
 
             if (!target) {
@@ -759,10 +831,17 @@ export default defineComponent({
 
         closeOsDialog() {
             this.osDialogOpen = false;
+            this.osDialogPagamentos = [];
+            this.osDialogItem = emptyOrdemServicoFormValues();
         },
 
         onOsDialogOpenChange(open: boolean) {
             this.osDialogOpen = open;
+
+            if (!open) {
+                this.osDialogPagamentos = [];
+                this.osDialogItem = emptyOrdemServicoFormValues();
+            }
         },
 
         applyRegistroLocks(registro: RegistroApi) {
@@ -793,10 +872,18 @@ export default defineComponent({
                     )
                 ]);
 
+                const os = osResponse.data.data;
+
                 this.osClientes = clientes.data.data ?? [];
                 this.osVeiculos = veiculos.data.data ?? [];
+                const cliente = this.osClientes.find(
+                    (entry) => entry.documento === os.clienteDocumento
+                );
+                const veiculo = this.osVeiculos.find((entry) => entry.id === os.veiculoId);
+
                 this.osDialogKey += 1;
-                this.osDialogItem = toOsForm(osResponse.data.data);
+                this.osDialogItem = mergeOrdemServicoFormValues(toOsForm(os, cliente, veiculo));
+                this.osDialogPagamentos = this.mapPagamentosFromApi(os.pagamentos);
                 this.osDialogOpen = true;
             } catch (error) {
                 notifyHttpError(

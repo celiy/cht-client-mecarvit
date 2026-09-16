@@ -5,110 +5,158 @@
 
         @submit.prevent="onSubmit"
     >
-        <div class="flex flex-col gap-1">
-            <Select
-                v-if="!isView"
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="flex flex-col gap-1">
+                <Select
+                    v-if="!isView"
 
-                id="clienteDocumento"
-                header="Cliente"
-                :options="clienteOptions"
-                :search="clienteSearch"
-                :model-value="formValues.clienteDocumento"
-                :action-icon="mode === 'view' ? undefined : 'fa-plus'"
-                action-side="right"
-                action-tooltip="Cadastrar cliente"
+                    id="clienteDocumento"
+                    combobox
+                    combobox-option
+                    header="Cliente *"
+                    :options="clienteOptions"
+                    :search="clienteSearch"
+                    :model-value="formValues.clienteDocumento"
+                    :query="formValues.clienteNome"
+                    :error="fieldError('clienteDocumento') || fieldError('clienteNome')"
 
-                @update:value="onClienteChange"
-                @click:action="$emit('click:cliente-action')"
-                @search:external="onSearchExternal('clienteDocumento', $event)"
+                    @update:value="onClienteSelect"
+                    @update:query="onClienteQuery"
+                    @search:external="onSearchExternal('clienteDocumento', $event)"
+                />
+
+                <Input
+                    v-else
+
+                    id="clienteDocumento"
+                    type="text"
+                    label="Cliente"
+                    variant="display"
+                    readonly
+                    copiable
+                    :value="clienteLabel"
+                />
+            </div>
+
+            <Input
+                v-if="showClienteCpfField"
+
+                id="clienteCpfNovo"
+                type="cpf"
+                label="CPF do cliente"
+                required
+                variant="secondary"
+                :value="formValues.clienteCpfNovo"
+                :error="fieldError('clienteCpfNovo')"
+
+                @update:value="updateValue('clienteCpfNovo', $event)"
             />
 
             <Input
-                v-else
+                v-if="showClienteCelField"
 
-                id="clienteDocumento"
-                type="text"
-                label="Cliente"
-                variant="display"
-                readonly
-                copiable
-                :value="clienteLabel"
+                id="clienteCel"
+                type="phone"
+                label="Celular do cliente"
+                :variant="isView ? 'display' : 'secondary'"
+                :readonly="isView"
+                :value="formValues.clienteCel"
+                :error="fieldError('clienteCel')"
+
+                @update:value="updateValue('clienteCel', $event)"
             />
-
-            <p
-                v-if="fieldError('clienteDocumento')"
-
-                class="mt-1 rounded border border-destructive/20! bg-destructive/10! p-1 px-1.5 text-sm text-destructive/90!"
-            >
-                {{ fieldError("clienteDocumento") }}
-            </p>
         </div>
 
-        <div class="flex flex-col gap-1">
-            <Select
-                v-if="!isView"
+        <Marker separator />
 
-                id="veiculoId"
-                header="Veículo"
-                :options="filteredVeiculoOptions"
-                :search="veiculoSearch"
-                :model-value="formValues.veiculoId"
-                :disabled="!hasCliente"
-                action-icon="fa-plus"
-                action-side="right"
-                action-tooltip="Cadastrar veículo"
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div class="flex flex-col gap-1">
+                <Select
+                    v-if="!isView"
 
-                @update:value="updateValue('veiculoId', $event)"
-                @click:action="$emit('click:veiculo-action')"
-                @search:external="onSearchExternal('veiculoId', $event)"
-            />
+                    id="veiculoId"
+                    combobox
+                    combobox-option
+                    header="Modelo *"
+                    :options="veiculoModeloOptions"
+                    :search="veiculoSearch"
+                    :model-value="formValues.veiculoId"
+                    :query="formValues.veiculoModelo"
+                    :disabled="!canEditVeiculoFields"
+                    :error="fieldError('veiculoId') || fieldError('veiculoModelo')"
+
+                    @update:value="onVeiculoSelect"
+                    @update:query="onVeiculoModeloQuery"
+                    @search:external="onSearchExternal('veiculoId', $event)"
+                />
+
+                <Input
+                    v-else
+
+                    id="veiculoModelo"
+                    type="text"
+                    label="Modelo"
+                    variant="display"
+                    readonly
+                    :value="formValues.veiculoModelo || veiculoLabel"
+                />
+            </div>
 
             <Input
-                v-else
-
-                id="veiculoId"
+                id="veiculoPlaca"
                 type="text"
-                label="Veículo"
-                variant="display"
-                readonly
-                copiable
-                :value="veiculoLabel"
+                label="Placa"
+                required
+                :variant="isView ? 'display' : 'secondary'"
+                :readonly="isView"
+                :disabled="!canEditVeiculoFields && !isView"
+                :value="formValues.veiculoPlaca"
+                :error="fieldError('veiculoPlaca')"
+
+                @update:value="updateValue('veiculoPlaca', $event)"
             />
-
-            <p
-                v-if="fieldError('veiculoId')"
-
-                class="mt-1 rounded border border-destructive/20! bg-destructive/10! p-1 px-1.5 text-sm text-destructive/90!"
-            >
-                {{ fieldError("veiculoId") }}
-            </p>
         </div>
 
-        <div
-            v-if="statusOptions.length > 0"
+        <div class="grid gap-4 sm:grid-cols-2">
+            <Input
+                id="veiculoKilometragem"
+                type="number"
+                label="Quilometragem"
+                :variant="isView ? 'display' : 'secondary'"
+                :readonly="isView"
+                :disabled="!canEditVeiculoFields && !isView"
+                :value="formValues.veiculoKilometragem"
+                :error="fieldError('veiculoKilometragem')"
 
-            class="flex flex-col gap-1"
-        >
+                @update:value="updateValue('veiculoKilometragem', $event)"
+            />
+
             <Select
                 v-if="!isView"
 
-                id="statusOsId"
-                header="Status"
-                :options="statusOptions"
-                :model-value="formValues.statusOsId"
+                id="veiculoTipo"
+                combobox
+                combobox-option
+                header="Tipo"
+                :options="veiculoTipoOptions"
+                :model-value="formValues.veiculoTipo"
+                :query="veiculoTipoQuery"
+                :disabled="!canEditVeiculoFields"
+                :error="fieldError('veiculoTipo')"
 
-                @update:value="updateValue('statusOsId', $event)"
+                @update:value="onVeiculoTipoSelect"
+                @update:query="onVeiculoTipoQuery"
             />
 
             <Input
                 v-else
 
-                id="statusOsId"
+                id="veiculoTipo"
                 type="text"
-                label="Status"
+                label="Tipo"
                 variant="display"
                 readonly
-                :value="statusLabel"
+                :value="veiculoTipoLabel"
             />
         </div>
 
@@ -138,6 +186,38 @@
             />
         </div>
 
+        <Marker separator />
+
+        <div
+            v-if="statusOptions.length > 0"
+
+            class="flex flex-col gap-1"
+        >
+            <Select
+                v-if="!isView"
+
+                id="statusOsId"
+                header="Status"
+                :options="statusOptions"
+                :model-value="formValues.statusOsId"
+
+                @update:value="updateValue('statusOsId', $event)"
+            />
+
+            <Input
+                v-else
+
+                id="statusOsId"
+                type="text"
+                label="Status"
+                variant="display"
+                readonly
+                :value="statusLabel"
+            />
+        </div>
+
+        <Marker separator />
+
         <Input
             id="diagnosticoCliente"
             type="textarea"
@@ -162,6 +242,8 @@
             @update:value="updateValue('diagnosticoMecanico', $event)"
         />
 
+        <Marker separator />
+
         <OrdemServicoItensSection
             :mode="mode"
             :items="formValues.itens"
@@ -171,10 +253,66 @@
             @search:servico="$emit('search:servico', $event)"
         />
 
+        <div class="grid gap-4 rounded border border-dashed p-3 sm:grid-cols-3">
+            <Input
+                id="totalPecas"
+                type="money"
+                label="Total peças"
+                variant="display"
+                readonly
+                :value="totalsDisplay.pecas"
+            />
+
+            <Input
+                id="totalObra"
+                type="money"
+                label="Total mão de obra"
+                variant="display"
+                readonly
+                :value="totalsDisplay.obra"
+            />
+
+            <div class="flex flex-col gap-4">
+                <Input
+                    id="totalGeral"
+                    type="money"
+                    label="Total geral"
+                    variant="display"
+                    readonly
+                    :value="totalsDisplay.total"
+                />
+
+                <Input
+                    id="totalPago"
+                    type="money"
+                    label="Total pago até agora"
+                    variant="display"
+                    readonly
+                    :value="totalPagoDisplay"
+                />
+            </div>
+
+            <div
+                v-if="!isView"
+
+                class="flex w-full"
+                :class="pagamentosButtonRowClass"
+            >
+                <Button
+                    type="button"
+                    variant="outline"
+                    left-icon="fa-money-bill"
+                    :label="pagamentosButtonLabel"
+
+                    @click="$emit('click:pagamentos')"
+                />
+            </div>
+        </div>
+
         <Input
             id="obs"
             type="textarea"
-            label="Observação"
+            label="Observações"
             :variant="isView ? 'display' : 'secondary'"
             :readonly="isView"
             :value="formValues.obs"
@@ -182,14 +320,29 @@
 
             @update:value="updateValue('obs', $event)"
         />
+
+        <CriadoModificadoFields
+            v-if="isView"
+
+            id-prefix="os"
+            :criado-em="formValues.criadoEm"
+            :modificado-em="formValues.modificadoEm"
+        />
     </form>
 </template>
 
 <script lang="ts">
 import { defineComponent, type PropType } from "vue";
+import Button from "@design/components/Button.vue";
 import Input from "@design/components/Input.vue";
+import Marker from "@design/components/Marker.vue";
 import Select from "@design/components/Select.vue";
+import { VEICULO_TIPO_OPTIONS } from "@shared/mecarvit/veiculoTipos";
+import { formatDateInputValue } from "@shared/format/dateTime";
+import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
 import type { DialogMode } from "../js/crudHttp";
+import { sumPagamentosValor, type PagamentoFormRow } from "../js/pagamentoOptions";
+import CriadoModificadoFields from "./CriadoModificadoFields.vue";
 import OrdemServicoItensSection, {
     type OrdemServicoItemFormRow
 } from "./OrdemServicoItensSection.vue";
@@ -199,14 +352,29 @@ export type SelectOption = {
     value: string;
 };
 
+export type ClienteSelectOption = SelectOption & {
+    cel?: string;
+};
+
 export type VeiculoSelectOption = SelectOption & {
     clienteDocumento: string;
+    modelo: string;
+    placa: string;
+    kilometragem: string;
+    tipo: string;
 };
 
 export type OrdemServicoFormValues = {
     id?: number;
     clienteDocumento: string;
+    clienteNome: string;
+    clienteCpfNovo: string;
+    clienteCel: string;
     veiculoId: string;
+    veiculoModelo: string;
+    veiculoPlaca: string;
+    veiculoKilometragem: string;
+    veiculoTipo: string;
     statusOsId: string;
     dataInicio: string;
     dataConclusao: string;
@@ -214,6 +382,8 @@ export type OrdemServicoFormValues = {
     diagnosticoMecanico: string;
     obs: string;
     itens: OrdemServicoItemFormRow[];
+    criadoEm: string;
+    modificadoEm: string;
 };
 
 type ServicoSuggestion = {
@@ -221,13 +391,86 @@ type ServicoSuggestion = {
     nome: string;
 };
 
+export function emptyOrdemServicoFormValues(options?: {
+    defaultStatusId?: string;
+    dataInicioToday?: boolean;
+}): OrdemServicoFormValues {
+    const defaultStatusId = options?.defaultStatusId ?? "1";
+
+    return {
+        clienteDocumento: "",
+        clienteNome: "",
+        clienteCpfNovo: "",
+        clienteCel: "",
+        veiculoId: "",
+        veiculoModelo: "",
+        veiculoPlaca: "",
+        veiculoKilometragem: "",
+        veiculoTipo: "",
+        statusOsId: defaultStatusId,
+        dataInicio: options?.dataInicioToday ? formatDateInputValue(new Date()) : "",
+        dataConclusao: "",
+        diagnosticoCliente: "",
+        diagnosticoMecanico: "",
+        obs: "",
+        itens: [],
+        criadoEm: "",
+        modificadoEm: ""
+    };
+}
+
+export function mergeOrdemServicoFormValues(
+    partial?: Partial<OrdemServicoFormValues>
+): OrdemServicoFormValues {
+    const base = emptyOrdemServicoFormValues();
+
+    if (!partial) {
+        return base;
+    }
+
+    return {
+        ...base,
+        ...partial,
+        clienteDocumento: String(partial.clienteDocumento ?? base.clienteDocumento),
+        clienteNome: String(partial.clienteNome ?? base.clienteNome),
+        clienteCpfNovo: String(partial.clienteCpfNovo ?? base.clienteCpfNovo),
+        clienteCel: String(partial.clienteCel ?? base.clienteCel),
+        veiculoId: String(partial.veiculoId ?? base.veiculoId),
+        veiculoModelo: String(partial.veiculoModelo ?? base.veiculoModelo),
+        veiculoPlaca: String(partial.veiculoPlaca ?? base.veiculoPlaca),
+        veiculoKilometragem: String(partial.veiculoKilometragem ?? base.veiculoKilometragem),
+        veiculoTipo: String(partial.veiculoTipo ?? base.veiculoTipo),
+        statusOsId: String(partial.statusOsId ?? base.statusOsId),
+        dataInicio: String(partial.dataInicio ?? base.dataInicio),
+        dataConclusao: String(partial.dataConclusao ?? base.dataConclusao),
+        diagnosticoCliente: String(partial.diagnosticoCliente ?? base.diagnosticoCliente),
+        diagnosticoMecanico: String(partial.diagnosticoMecanico ?? base.diagnosticoMecanico),
+        obs: String(partial.obs ?? base.obs),
+        criadoEm: String(partial.criadoEm ?? base.criadoEm),
+        modificadoEm: String(partial.modificadoEm ?? base.modificadoEm),
+        itens: [...(partial.itens ?? base.itens)]
+    };
+}
+
+function ordemServicoFieldText(
+    values: OrdemServicoFormValues,
+    field: keyof OrdemServicoFormValues
+): string {
+    const value = values[field];
+
+    return String(value ?? "").trim();
+}
+
 export default defineComponent({
     name: "OrdemServicoForm",
 
     components: {
+        Button,
+        CriadoModificadoFields,
         Input,
-        Select,
-        OrdemServicoItensSection
+        Marker,
+        OrdemServicoItensSection,
+        Select
     },
 
     props: {
@@ -247,7 +490,7 @@ export default defineComponent({
         },
 
         clienteOptions: {
-            type: Array as PropType<SelectOption[]>,
+            type: Array as PropType<ClienteSelectOption[]>,
             default: () => []
         },
 
@@ -266,24 +509,28 @@ export default defineComponent({
             default: () => []
         },
 
+        pagamentosButtonLabel: {
+            type: String,
+            default: "Gerenciar pagamentos"
+        },
+
+        pagamentos: {
+            type: Array as PropType<PagamentoFormRow[]>,
+            default: () => []
+        },
+
         errors: {
             type: Object as PropType<Record<string, string>>,
             default: () => ({})
         }
     },
 
-    emits: [
-        "submit",
-        "click:cliente-action",
-        "click:veiculo-action",
-        "search:external",
-        "search:servico",
-        "change:cliente"
-    ],
+    emits: ["submit", "search:external", "search:servico", "change:cliente", "click:pagamentos"],
 
     data() {
         return {
-            formValues: { ...this.values, itens: [...(this.values.itens ?? [])] } as OrdemServicoFormValues,
+            formValues: mergeOrdemServicoFormValues(this.values),
+            veiculoTipoQuery: "",
             localErrors: {} as Record<string, string>
         };
     },
@@ -291,10 +538,6 @@ export default defineComponent({
     computed: {
         isView(): boolean {
             return this.mode === "view";
-        },
-
-        hasCliente(): boolean {
-            return Boolean(String(this.formValues.clienteDocumento ?? "").trim());
         },
 
         clienteSearch() {
@@ -311,6 +554,53 @@ export default defineComponent({
             };
         },
 
+        veiculoTipoOptions(): SelectOption[] {
+            return VEICULO_TIPO_OPTIONS.map((option) => ({
+                label: option.label,
+                value: option.value
+            }));
+        },
+
+        hasClienteSelecionado(): boolean {
+            return Boolean(String(this.formValues.clienteDocumento ?? "").trim());
+        },
+
+        showClienteCpfField(): boolean {
+            if (this.isView) {
+                return false;
+            }
+
+            return (
+                !this.hasClienteSelecionado &&
+                Boolean(ordemServicoFieldText(this.formValues, "clienteNome"))
+            );
+        },
+
+        showClienteCelField(): boolean {
+            if (this.isView) {
+                return Boolean(ordemServicoFieldText(this.formValues, "clienteCel"));
+            }
+
+            return (
+                this.hasClienteSelecionado ||
+                (!this.hasClienteSelecionado &&
+                    Boolean(ordemServicoFieldText(this.formValues, "clienteNome")))
+            );
+        },
+
+        canEditVeiculoFields(): boolean {
+            return (
+                this.hasClienteSelecionado ||
+                Boolean(ordemServicoFieldText(this.formValues, "clienteNome"))
+            );
+        },
+
+        pagamentosButtonRowClass(): string {
+            const isMobile = this.$project?.device?.isMobile ?? false;
+
+            return isMobile ? "justify-end" : "justify-start";
+        },
+
         filteredVeiculoOptions(): VeiculoSelectOption[] {
             const documento = this.formValues.clienteDocumento;
 
@@ -321,22 +611,78 @@ export default defineComponent({
             return this.veiculoOptions.filter((option) => option.clienteDocumento === documento);
         },
 
-        clienteLabel(): string {
-            const found = this.clienteOptions.find((option) => option.value === this.formValues.clienteDocumento);
+        veiculoModeloOptions(): SelectOption[] {
+            return this.filteredVeiculoOptions.map((option) => ({
+                label: option.modelo,
+                value: option.value
+            }));
+        },
 
-            return found?.label || this.formValues.clienteDocumento || "—";
+        clienteLabel(): string {
+            const found = this.clienteOptions.find(
+                (option) => option.value === this.formValues.clienteDocumento
+            );
+
+            if (found) {
+                return found.label;
+            }
+
+            return this.formValues.clienteNome || this.formValues.clienteDocumento || "—";
         },
 
         veiculoLabel(): string {
-            const found = this.veiculoOptions.find((option) => option.value === this.formValues.veiculoId);
+            const found = this.veiculoOptions.find(
+                (option) => option.value === this.formValues.veiculoId
+            );
 
-            return found?.label || this.formValues.veiculoId || "—";
+            if (found) {
+                return `${found.modelo} · ${found.placa}`;
+            }
+
+            return this.formValues.veiculoModelo || "—";
+        },
+
+        veiculoTipoLabel(): string {
+            const found = this.veiculoTipoOptions.find(
+                (option) => option.value === this.formValues.veiculoTipo
+            );
+
+            return found?.label || this.formValues.veiculoTipo || "—";
         },
 
         statusLabel(): string {
-            const found = this.statusOptions.find((option) => option.value === this.formValues.statusOsId);
+            const found = this.statusOptions.find(
+                (option) => option.value === this.formValues.statusOsId
+            );
 
             return found?.label || this.formValues.statusOsId || "—";
+        },
+
+        totalsDisplay(): { pecas: string; obra: string; total: string } {
+            let pecas = 0;
+            let obra = 0;
+
+            for (const item of this.formValues.itens ?? []) {
+                const qty = Number(item.quantidade);
+                const quantidade = Number.isFinite(qty) && qty > 0 ? qty : 0;
+                const valorPecas = parseMoneyInput(item.valorPecas) ?? 0;
+                const valorObra = parseMoneyInput(item.valorObra) ?? 0;
+
+                pecas += quantidade * valorPecas;
+                obra += quantidade * valorObra;
+            }
+
+            const total = pecas + obra;
+
+            return {
+                pecas: moneyAmountToInputDigits(pecas),
+                obra: moneyAmountToInputDigits(obra),
+                total: moneyAmountToInputDigits(total)
+            };
+        },
+
+        totalPagoDisplay(): string {
+            return moneyAmountToInputDigits(sumPagamentosValor(this.pagamentos));
         }
     },
 
@@ -344,13 +690,15 @@ export default defineComponent({
         values: {
             deep: true,
             handler(next: OrdemServicoFormValues) {
-                this.formValues = {
-                    ...next,
-                    itens: [...(next.itens ?? [])]
-                };
+                this.formValues = mergeOrdemServicoFormValues(next);
+                this.syncVeiculoTipoQuery();
                 this.localErrors = {};
             }
         }
+    },
+
+    mounted() {
+        this.syncVeiculoTipoQuery();
     },
 
     methods: {
@@ -395,29 +743,147 @@ export default defineComponent({
             });
         },
 
-        onClienteChange(value: string) {
-            this.updateValue("clienteDocumento", value);
+        onClienteQuery(value: string) {
+            this.updateValue("clienteNome", value);
 
-            const stillValid = this.filteredVeiculoOptions.some(
+            if (!this.hasClienteSelecionado) {
+                this.updateValue("clienteCpfNovo", "");
+            }
+        },
+
+        onClienteSelect(documento: string) {
+            if (!documento) {
+                this.updateValue("clienteDocumento", "");
+                this.updateValue("clienteCpfNovo", "");
+                this.updateValue("clienteCel", "");
+                this.resetVeiculoIfNeeded();
+
+                return;
+            }
+
+            this.updateValue("clienteDocumento", documento);
+            this.updateValue("clienteCpfNovo", "");
+
+            const found = this.clienteOptions.find((option) => option.value === documento);
+
+            if (found) {
+                this.updateValue("clienteNome", found.label);
+                this.updateValue("clienteCel", found.cel ?? "");
+            }
+
+            this.resetVeiculoIfNeeded();
+            this.$emit("change:cliente", documento);
+        },
+
+        onVeiculoModeloQuery(value: string) {
+            this.updateValue("veiculoModelo", value);
+
+            if (this.formValues.veiculoId) {
+                this.updateValue("veiculoId", "");
+                this.updateValue("veiculoPlaca", "");
+                this.updateValue("veiculoKilometragem", "");
+                this.updateValue("veiculoTipo", "");
+                this.veiculoTipoQuery = "";
+            }
+        },
+
+        onVeiculoSelect(veiculoId: string) {
+            if (!veiculoId) {
+                this.updateValue("veiculoId", "");
+                this.updateValue("veiculoPlaca", "");
+                this.updateValue("veiculoKilometragem", "");
+                this.updateValue("veiculoTipo", "");
+                this.veiculoTipoQuery = "";
+
+                return;
+            }
+
+            const found = this.filteredVeiculoOptions.find((option) => option.value === veiculoId);
+
+            this.updateValue("veiculoId", veiculoId);
+
+            if (!found) {
+                return;
+            }
+
+            this.updateValue("veiculoModelo", found.modelo);
+            this.updateValue("veiculoPlaca", found.placa);
+            this.updateValue("veiculoKilometragem", found.kilometragem);
+            this.updateValue("veiculoTipo", found.tipo);
+            this.syncVeiculoTipoQuery();
+        },
+
+        resetVeiculoIfNeeded() {
+            const documento = this.formValues.clienteDocumento;
+            const current = this.veiculoOptions.find(
                 (option) => option.value === this.formValues.veiculoId
             );
 
-            if (!stillValid) {
-                this.updateValue("veiculoId", "");
+            if (current && current.clienteDocumento === documento) {
+                return;
             }
 
-            this.$emit("change:cliente", value);
+            this.updateValue("veiculoId", "");
+            this.updateValue("veiculoModelo", "");
+            this.updateValue("veiculoPlaca", "");
+            this.updateValue("veiculoKilometragem", "");
+            this.updateValue("veiculoTipo", "");
+            this.veiculoTipoQuery = "";
+        },
+
+        syncVeiculoTipoQuery() {
+            const found = this.veiculoTipoOptions.find(
+                (option) => option.value === this.formValues.veiculoTipo
+            );
+
+            this.veiculoTipoQuery = found?.label ?? this.formValues.veiculoTipo;
+        },
+
+        onVeiculoTipoSelect(value: string) {
+            this.updateValue("veiculoTipo", value);
+            this.syncVeiculoTipoQuery();
+        },
+
+        onVeiculoTipoQuery(value: string) {
+            this.veiculoTipoQuery = value;
+
+            if (!this.formValues.veiculoTipo) {
+                this.updateValue("veiculoTipo", value.trim().toLowerCase());
+            }
         },
 
         onSubmit() {
             const errors: Record<string, string> = {};
 
-            if (!this.formValues.clienteDocumento) {
-                errors.clienteDocumento = "Cliente é obrigatório";
+            const hasCliente =
+                Boolean(ordemServicoFieldText(this.formValues, "clienteDocumento")) ||
+                Boolean(ordemServicoFieldText(this.formValues, "clienteNome"));
+
+            if (!hasCliente) {
+                errors.clienteNome = "Cliente é obrigatório";
+            }
+
+            if (
+                !ordemServicoFieldText(this.formValues, "clienteDocumento") &&
+                ordemServicoFieldText(this.formValues, "clienteNome")
+            ) {
+                if (!ordemServicoFieldText(this.formValues, "clienteCpfNovo")) {
+                    errors.clienteCpfNovo = "CPF é obrigatório para novo cliente";
+                }
+            }
+
+            const hasVeiculo =
+                Boolean(this.formValues.veiculoId) ||
+                Boolean(ordemServicoFieldText(this.formValues, "veiculoModelo"));
+
+            if (!hasVeiculo) {
+                errors.veiculoModelo = "Modelo do veículo é obrigatório";
             }
 
             if (!this.formValues.veiculoId) {
-                errors.veiculoId = "Veículo é obrigatório";
+                if (!ordemServicoFieldText(this.formValues, "veiculoPlaca")) {
+                    errors.veiculoPlaca = "Placa é obrigatória";
+                }
             }
 
             if (Object.keys(errors).length > 0) {

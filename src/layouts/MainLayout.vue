@@ -1,5 +1,5 @@
 <template>
-    <main class="relative flex h-dvh w-full flex-col overflow-hidden">
+    <main class="relative flex h-screen w-full flex-col overflow-hidden">
         <Sidebar
             :title="$mecarvit.company?.nome"
             description="Sistema Mecarvit"

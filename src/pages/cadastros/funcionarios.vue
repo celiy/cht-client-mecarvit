@@ -73,6 +73,8 @@ import {
 
 interface UsuarioApi {
     cpf: string;
+    criadoEm?: string;
+    modificadoEm?: string;
     nome: string;
     email: string;
     ativo: boolean;
@@ -87,6 +89,8 @@ interface CargoApi {
 }
 
 interface FuncionarioFormValues {
+    criadoEm?: string;
+    modificadoEm?: string;
     nome: string;
     email: string;
     cpf: string;
@@ -120,6 +124,8 @@ function emptyFormValues(): FuncionarioFormValues {
 
 function toFormValues(user: UsuarioApi): FuncionarioFormValues {
     return {
+        criadoEm: user.criadoEm ?? "",
+        modificadoEm: user.modificadoEm ?? "",
         nome: user.nome ?? "",
         email: user.email ?? "",
         cpf: user.cpf ?? "",

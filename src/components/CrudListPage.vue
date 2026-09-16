@@ -88,12 +88,16 @@ import { CRUD_ROW_ACTIONS, isCadastrarQuery } from "../js/crudHttp";
 import FilterInputs, { type FilterDef } from "./FilterInputs.vue";
 
 import type { TableCellMaskFormat } from "@shared/format/displayMasks";
+import type { TableHeaderBadgeProps } from "@design/components/Table.vue";
+
+export type { TableHeaderBadgeProps };
 
 export type TableHeader = {
     label: string;
     field?: string;
     position?: "start" | "center" | "end";
     format?: TableCellMaskFormat;
+    badgeProps?: TableHeaderBadgeProps;
 };
 
 export default defineComponent({

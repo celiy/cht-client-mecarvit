@@ -101,6 +101,8 @@ import {
 
 interface VeiculoApi {
     id?: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     modelo: string;
     placa: string;
     tipo?: string | null;
@@ -113,6 +115,8 @@ interface VeiculoApi {
 
 interface EnderecoApi {
     id: number;
+    criadoEm?: string;
+    modificadoEm?: string;
     estado: string;
     cidade: string;
     cep: string;
@@ -124,6 +128,8 @@ interface EnderecoApi {
 
 interface ClienteApi {
     documento: string;
+    criadoEm?: string;
+    modificadoEm?: string;
     nome: string;
     nomeSocial?: string | null;
     email?: string | null;
@@ -136,6 +142,8 @@ interface ClienteApi {
 
 interface ClienteFormValues {
     documento: string;
+    criadoEm?: string;
+    modificadoEm?: string;
     nome: string;
     nomeSocial: string;
     email: string;
@@ -176,6 +184,8 @@ function toClienteForm(cliente: ClienteApi): ClienteFormValues {
 
     return {
         documento: cliente.documento ?? "",
+        criadoEm: cliente.criadoEm ?? "",
+        modificadoEm: cliente.modificadoEm ?? "",
         nome: cliente.nome ?? "",
         nomeSocial: cliente.nomeSocial ?? "",
         email: cliente.email ?? "",
@@ -704,7 +714,9 @@ export default defineComponent({
                 bairro: found.bairro,
                 rua: found.rua,
                 numero: String(found.numero),
-                complemento: found.complemento
+                complemento: found.complemento,
+                criadoEm: found.criadoEm ?? "",
+                modificadoEm: found.modificadoEm ?? ""
             };
             this.enderecoDialogOpen = true;
         },
@@ -857,7 +869,9 @@ export default defineComponent({
                     placa: veiculo.placa ?? "",
                     tipo: veiculo.tipo ?? "",
                     ...veiculoExtrasFromApi(veiculo),
-                    ativo: veiculo.ativo !== false
+                    ativo: veiculo.ativo !== false,
+                    criadoEm: veiculo.criadoEm ?? "",
+                    modificadoEm: veiculo.modificadoEm ?? ""
                 };
                 this.veiculoSaving = false;
                 this.veiculoDialogOpen = true;
