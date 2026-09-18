@@ -121,6 +121,12 @@
                 }
             ]"
         >
+            <template #top-bar>
+                <div class="ml-auto flex items-center pr-2">
+                    <AppUpdateButton />
+                </div>
+            </template>
+
             <template #footer>
                 <div class="text-sm">
                     <Marker separator />
@@ -206,6 +212,7 @@ import { clearAuthToken } from "@base/http";
 import { project } from "@base/project";
 import { clearMecarvitSession } from "../js/mecarvit";
 import Button from "@design/components/Button.vue";
+import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 
 const router = useRouter();
 

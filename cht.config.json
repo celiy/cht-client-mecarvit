@@ -8,5 +8,10 @@
     "backend": {
         "repo": "https://github.com/celiy/cht-backend-mecarvit.git",
         "script": "dev"
+    },
+    "publish": {
+        "provider": "github",
+        "owner": "celiy",
+        "repo": "cht-client-mecarvit"
     }
 }

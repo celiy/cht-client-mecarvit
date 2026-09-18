@@ -1,4 +1,6 @@
 <template>
+    <AppUpdateButton class="fixed top-4 right-4 z-50" />
+
     <main class="flex min-h-dvh items-center justify-center p-6">
         <Card class="w-full max-w-md">
             <template #header>
@@ -92,11 +94,16 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import { HttpError } from "@base/http";
+import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 import { validateLogin } from "@shared/validators/auth";
 import { completeAuth, type AuthApiResponse, type EmpresaLocal } from "../js/auth";
 
 export default defineComponent({
     name: "MecarvitLoginPage",
+
+    components: {
+        AppUpdateButton
+    },
 
     data() {
         return {

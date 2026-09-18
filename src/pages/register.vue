@@ -1,4 +1,6 @@
 <template>
+    <AppUpdateButton class="fixed top-4 right-4 z-50" />
+
     <main class="flex min-h-dvh items-center justify-center p-6">
         <Card class="w-full max-w-md">
             <template #header>
@@ -120,6 +122,7 @@ import Button from "@design/components/Button.vue";
 import Card from "@design/components/Card.vue";
 import Input from "@design/components/Input.vue";
 import { HttpError } from "@base/http";
+import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 import { validateCadastro } from "@shared/validators/mecarvit";
 import { completeAuth, type AuthApiResponse } from "../js/auth";
 
@@ -127,6 +130,7 @@ export default defineComponent({
     name: "MecarvitRegisterPage",
 
     components: {
+        AppUpdateButton,
         Button,
         Card,
         Input
