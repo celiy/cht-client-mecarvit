@@ -1,5 +1,5 @@
 <template>
-    <AppUpdateButton class="fixed top-4 right-4 z-50" />
+    <AppUpdateButton class="fixed top-4 right-2 z-50" />
 
     <div class="container-center mt-8">
         <img
