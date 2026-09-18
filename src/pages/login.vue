@@ -1,6 +1,16 @@
 <template>
     <AppUpdateButton class="fixed top-4 right-4 z-50" />
 
+    <div class="container-center mt-8">
+        <img
+            class="mx-auto mb-3 h-24 w-24"
+            :src="logo"
+            alt="Mecarvit"
+        />
+
+        <h1>Mecarvit</h1>
+    </div>
+
     <main class="flex min-h-dvh items-center justify-center p-6">
         <Card class="w-full max-w-md">
             <template #header>
@@ -39,7 +49,23 @@
                         required
                     />
 
-                    <div v-if="empresaOptions.length > 0">
+                    <div
+                        v-if="loadingEmpresas"
+
+                        class="flex flex-col gap-2"
+                    >
+                        <Skeleton
+                            type="text"
+                            class="w-16"
+                        />
+
+                        <Skeleton
+                            type="card"
+                            class="h-11 w-full"
+                        />
+                    </div>
+
+                    <div v-else-if="empresaOptions.length > 0">
                         <Select
                             id="login-empresa"
                             v-model="empresaId"
@@ -68,6 +94,8 @@
                     />
 
                     <Button
+                        v-if="!loadingEmpresas"
+
                         label="Entrar"
                         variant="primary"
                         class="w-full"
@@ -75,7 +103,11 @@
                         :disabled="loading"
                     />
 
-                    <small class="text-center text-sm">
+                    <small
+                        v-if="!loadingEmpresas"
+
+                        class="text-center text-sm"
+                    >
                         Não tem conta?
 
                         <RouterLink
@@ -96,6 +128,7 @@ import { defineComponent } from "vue";
 import { HttpError } from "@base/http";
 import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 import { validateLogin } from "@shared/validators/auth";
+import logo from "../assets/logo.png";
 import { completeAuth, type AuthApiResponse, type EmpresaLocal } from "../js/auth";
 
 export default defineComponent({
@@ -107,10 +140,12 @@ export default defineComponent({
 
     data() {
         return {
+            logo,
             email: "",
             senha: "",
             empresaId: "" as string | number,
             empresas: [] as EmpresaLocal[],
+            loadingEmpresas: true,
             loading: false,
             formError: "",
             errors: {
@@ -127,6 +162,25 @@ export default defineComponent({
                 label: empresa.nome,
                 value: String(empresa.id)
             }));
+        },
+
+        backendReady(): boolean {
+            return this.$project.electron.backendReady;
+        }
+    },
+
+    watch: {
+        /**
+         * In Electron the page mounts before the local backend starts
+         * listening, so the first request may be refused and the workshop list
+         * would stay empty forever. Retry once the backend reports ready.
+         */
+        backendReady(ready: boolean) {
+            if (!ready || this.empresas.length > 0) {
+                return;
+            }
+
+            void this.loadEmpresas();
         }
     },
 
@@ -172,6 +226,8 @@ export default defineComponent({
                 }
             } catch {
                 this.empresas = [];
+            } finally {
+                this.loadingEmpresas = false;
             }
         },
 
