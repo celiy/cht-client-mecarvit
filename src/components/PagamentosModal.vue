@@ -130,27 +130,6 @@
 
                     @update:value="valor = String($event ?? '')"
                 />
-
-                <div class="flex flex-wrap gap-2">
-                    <Button
-                        type="submit"
-                        variant="outline"
-                        size="small"
-                        left-icon="fa-plus"
-                        :label="editingIndex === null ? 'Adicionar pagamento' : 'Aplicar alteração'"
-                    />
-
-                    <Button
-                        v-if="editingIndex !== null"
-
-                        type="button"
-                        variant="secondary"
-                        size="small"
-                        label="Cancelar edição"
-
-                        @click="resetForm"
-                    />
-                </div>
             </form>
         </template>
 
@@ -162,21 +141,32 @@
                     variant="primary"
                     type="button"
                     :disabled="saving"
+                    :label="primaryActionLabel"
 
-                    @click.stop="onConfirm"
-                >
-                    Salvar
-                </Button>
+                    @click.stop.prevent="onPrimaryAction"
+                />
 
                 <Button
+                    v-else
+
+                    variant="primary"
+                    type="button"
+                    :disabled="saving"
+                    label="Fechar"
+
+                    @click.stop.prevent="onCancel"
+                />
+
+                <Button
+                    v-if="!readonly"
+
                     variant="secondary"
                     type="button"
                     :disabled="saving"
+                    :label="cancelButtonLabel"
 
-                    @click="onCancel"
-                >
-                    {{ readonly ? "Fechar" : "Cancelar" }}
-                </Button>
+                    @click.stop.prevent="onCancel"
+                />
             </div>
         </template>
     </Modal>
@@ -257,6 +247,26 @@ export default defineComponent({
             return Number.isFinite(this.valorTotal);
         },
 
+        hasUnappliedDraft(): boolean {
+            return String(this.valor ?? "").trim() !== "";
+        },
+
+        primaryActionLabel(): string {
+            if (!this.readonly && this.hasUnappliedDraft) {
+                return this.editingIndex === null ? "Adicionar pagamento" : "Aplicar alteração";
+            }
+
+            return this.readonly ? "Fechar" : "Salvar";
+        },
+
+        cancelButtonLabel(): string {
+            if (!this.readonly && this.hasUnappliedDraft) {
+                return this.editingIndex === null ? "Cancelar pagamento" : "Cancelar alteração";
+            }
+
+            return this.readonly ? "Fechar" : "Cancelar";
+        },
+
         valorPagoAtual(): number {
             return sumPagamentosValor(this.localRows);
         }
@@ -334,21 +344,30 @@ export default defineComponent({
             }
         },
 
-        hasUnappliedDraft(): boolean {
-            return String(this.valor ?? "").trim() !== "";
+        onPrimaryAction() {
+            if (!this.readonly && this.hasUnappliedDraft) {
+                this.onApplyForm();
+
+                return;
+            }
+
+            this.onConfirm();
         },
 
         onApplyForm() {
+            const tipoFinal = (this.tipo ?? "").toString().trim() || "pix";
+            this.tipo = tipoFinal;
+
             const valorNum = parseMoneyInput(this.valor);
 
-            if (!this.tipo || valorNum === null || valorNum <= 0) {
+            if (!tipoFinal || valorNum === null || valorNum <= 0) {
                 this.$toast.error("Informe o tipo e um valor maior que zero.");
 
                 return;
             }
 
             const entry: PagamentoFormRow = {
-                tipo: this.tipo,
+                tipo: tipoFinal,
                 valor: String(valorNum)
             };
 
@@ -383,7 +402,7 @@ export default defineComponent({
         },
 
         onConfirm() {
-            if (this.hasUnappliedDraft()) {
+            if (this.hasUnappliedDraft) {
                 this.$toast.error(
                     'Aplique a alteração com "Adicionar à lista" ou "Aplicar alteração" antes de salvar.'
                 );
@@ -403,6 +422,18 @@ export default defineComponent({
         },
 
         onCancel() {
+            if (this.editingIndex) {
+                this.resetForm();
+
+                return;
+            }
+
+            if (!this.readonly && this.hasUnappliedDraft) {
+                this.resetForm();
+
+                return;
+            }
+
             this.$emit("update:isOpen", false);
             this.$emit("cancel");
         }

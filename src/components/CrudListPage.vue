@@ -44,7 +44,14 @@
                     :loading="loading"
 
                     @click:action="onRowAction"
-                />
+                >
+                    <template #empty>
+                        <EmptyTableMessage
+                            :title="emptyTitle"
+                            :description="emptyDescription"
+                        />
+                    </template>
+                </Table>
 
                 <Pagination
                     :id="paginationId"
@@ -86,6 +93,7 @@ import ConfirmationModal from "@design/components/custom/ConfirmationModal.vue";
 import type { OptionItem } from "@design/components/internal/OptionsList.vue";
 import { CRUD_ROW_ACTIONS, isCadastrarQuery } from "../js/crudHttp";
 import FilterInputs, { type FilterDef } from "./FilterInputs.vue";
+import EmptyTableMessage from "./EmptyTableMessage.vue";
 
 import type { TableCellMaskFormat } from "@shared/format/displayMasks";
 import type { TableHeaderBadgeProps } from "@design/components/Table.vue";
@@ -106,6 +114,7 @@ export default defineComponent({
     components: {
         Button,
         ConfirmationModal,
+        EmptyTableMessage,
         FilterInputs,
         Pagination
     },
@@ -174,10 +183,29 @@ export default defineComponent({
         deleteNameField: {
             type: String,
             default: "nome"
+        },
+
+        emptyTitle: {
+            type: String,
+            default: "Nenhum registro encontrado."
+        },
+
+        emptyDescription: {
+            type: String,
+            default: "Ajuste os filtros ou cadastre um novo registro."
         }
     },
 
-    emits: ["create", "filters", "reload", "page", "action", "delete", "search:external"],
+    emits: [
+        "create",
+        "close-create",
+        "filters",
+        "reload",
+        "page",
+        "action",
+        "delete",
+        "search:external"
+    ],
 
     data() {
         return {
@@ -203,12 +231,12 @@ export default defineComponent({
             immediate: true,
             handler(value: unknown) {
                 if (!isCadastrarQuery(value)) {
+                    this.$emit("close-create");
                     return;
                 }
 
                 this.$nextTick(() => {
                     this.$emit("create");
-                    this.clearCadastrarQuery();
                 });
             }
         }
@@ -217,6 +245,10 @@ export default defineComponent({
     methods: {
         clearCadastrarQuery() {
             const query = { ...this.$route.query };
+
+            if (!isCadastrarQuery(query.cadastrar)) {
+                return;
+            }
 
             delete query.cadastrar;
 

@@ -19,6 +19,7 @@ export type ItemViewEditExpose = {
     applyFieldErrors: (errors: Record<string, string>) => void;
     setFieldValue: (fieldId: string, value: unknown) => void;
     getFieldValue: (fieldId: string) => unknown;
+    closeSelect: (fieldId: string) => void;
 };
 
 export type ToastLike = {

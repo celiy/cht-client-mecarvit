@@ -67,6 +67,51 @@
             />
         </div>
 
+        <Select
+            v-if="!isView"
+
+            id="responsaveisCpfs"
+            label="Funcionário(s) responsáve(l/is)"
+            placeholder="Selecione um ou mais funcionários"
+            :options="funcionarioSelectOptionsResolved"
+            :search="funcionarioSearch"
+            :model-value="formValues.responsaveisCpfs"
+            :select-multiple="{ min: 0 }"
+            :error="fieldError('responsaveisCpfs')"
+
+            @update:value="onResponsaveisChange"
+            @search:external="onSearchExternal('responsaveisCpfs', $event)"
+        />
+
+        <div
+            v-else-if="isView && responsaveisViewItems.length > 0"
+
+            class="flex flex-col gap-1.5"
+        >
+            <span class="text-sm font-bold text-foreground"> Funcionário(s) responsáve(l/is) </span>
+
+            <ul
+                v-if="responsaveisViewItems.length > 0"
+
+                class="list-disc space-y-1 pl-5 text-sm text-foreground"
+            >
+                <li
+                    v-for="item in responsaveisViewItems"
+                    :key="item.value"
+                >
+                    <small>{{ item.label }}</small>
+                </li>
+            </ul>
+
+            <span
+                v-else
+
+                class="text-sm text-muted-foreground"
+            >
+                —
+            </span>
+        </div>
+
         <Marker separator />
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -197,7 +242,9 @@
                 v-if="!isView"
 
                 id="statusOsId"
-                header="Status"
+                label="Status"
+                placeholder="Selecione o status"
+                header="Selecione o status"
                 :options="statusOptions"
                 :model-value="formValues.statusOsId"
 
@@ -340,7 +387,8 @@ import Select from "@design/components/Select.vue";
 import { VEICULO_TIPO_OPTIONS } from "@shared/mecarvit/veiculoTipos";
 import { formatDateInputValue } from "@shared/format/dateTime";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
-import type { DialogMode } from "../js/crudHttp";
+import { documentDigits, type DialogMode } from "../js/crudHttp";
+import { currentUsuarioCpfDigits } from "../js/mecarvit";
 import { sumPagamentosValor, type PagamentoFormRow } from "../js/pagamentoOptions";
 import CriadoModificadoFields from "./CriadoModificadoFields.vue";
 import OrdemServicoItensSection, {
@@ -381,6 +429,7 @@ export type OrdemServicoFormValues = {
     diagnosticoCliente: string;
     diagnosticoMecanico: string;
     obs: string;
+    responsaveisCpfs: string[];
     itens: OrdemServicoItemFormRow[];
     criadoEm: string;
     modificadoEm: string;
@@ -413,6 +462,7 @@ export function emptyOrdemServicoFormValues(options?: {
         diagnosticoCliente: "",
         diagnosticoMecanico: "",
         obs: "",
+        responsaveisCpfs: [],
         itens: [],
         criadoEm: "",
         modificadoEm: ""
@@ -446,6 +496,9 @@ export function mergeOrdemServicoFormValues(
         diagnosticoCliente: String(partial.diagnosticoCliente ?? base.diagnosticoCliente),
         diagnosticoMecanico: String(partial.diagnosticoMecanico ?? base.diagnosticoMecanico),
         obs: String(partial.obs ?? base.obs),
+        responsaveisCpfs: Array.isArray(partial.responsaveisCpfs)
+            ? partial.responsaveisCpfs.map((cpf) => documentDigits(cpf)).filter(Boolean)
+            : [...base.responsaveisCpfs],
         criadoEm: String(partial.criadoEm ?? base.criadoEm),
         modificadoEm: String(partial.modificadoEm ?? base.modificadoEm),
         itens: [...(partial.itens ?? base.itens)]
@@ -496,6 +549,11 @@ export default defineComponent({
 
         veiculoOptions: {
             type: Array as PropType<VeiculoSelectOption[]>,
+            default: () => []
+        },
+
+        funcionarioOptions: {
+            type: Array as PropType<SelectOption[]>,
             default: () => []
         },
 
@@ -552,6 +610,60 @@ export default defineComponent({
                 external: true,
                 field: "modelo"
             };
+        },
+
+        funcionarioSearch() {
+            return {
+                external: true,
+                field: "nome"
+            };
+        },
+
+        funcionarioOptionsWithSelectedStubs(): SelectOption[] {
+            const options = [...this.funcionarioOptions];
+            const present = new Set(options.map((option) => documentDigits(option.value)));
+
+            for (const cpf of this.formValues.responsaveisCpfs) {
+                const digits = documentDigits(cpf);
+
+                if (!digits || present.has(digits)) {
+                    continue;
+                }
+
+                present.add(digits);
+                options.unshift({ label: digits, value: digits });
+            }
+
+            return options;
+        },
+
+        funcionarioSelectOptionsResolved(): SelectOption[] {
+            const current = currentUsuarioCpfDigits();
+
+            return this.funcionarioOptionsWithSelectedStubs.filter(
+                (option) => !current || documentDigits(option.value) !== current
+            );
+        },
+
+        responsaveisViewItems(): Array<{ label: string; value: string }> {
+            const options = this.funcionarioOptionsWithSelectedStubs;
+
+            return this.formValues.responsaveisCpfs
+                .map((cpf) => {
+                    const digits = documentDigits(cpf);
+
+                    if (!digits) {
+                        return null;
+                    }
+
+                    const found = options.find((option) => documentDigits(option.value) === digits);
+
+                    return {
+                        value: digits,
+                        label: found?.label ?? digits
+                    };
+                })
+                .filter((item): item is { label: string; value: string } => item != null);
         },
 
         veiculoTipoOptions(): SelectOption[] {
@@ -749,6 +861,16 @@ export default defineComponent({
             if (!this.hasClienteSelecionado) {
                 this.updateValue("clienteCpfNovo", "");
             }
+        },
+
+        onResponsaveisChange(value: string | string[]) {
+            const raw = Array.isArray(value) ? value : value ? [value] : [];
+            const current = currentUsuarioCpfDigits();
+            const next = raw
+                .map((cpf) => documentDigits(cpf))
+                .filter((cpf) => Boolean(cpf) && cpf !== current);
+
+            this.updateValue("responsaveisCpfs", next);
         },
 
         onClienteSelect(documento: string) {

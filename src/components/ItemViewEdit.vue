@@ -29,8 +29,17 @@
                 @search:external="onSearchExternal"
             >
                 <template
-                    v-if="$slots.formActions"
+                    v-if="$slots['select-inside-empty-panel']"
+                    #select-inside-empty-panel="slotProps"
+                >
+                    <slot
+                        name="select-inside-empty-panel"
+                        v-bind="slotProps"
+                    />
+                </template>
 
+                <template
+                    v-if="$slots.formActions"
                     #actions
                 >
                     <slot
@@ -41,6 +50,11 @@
                     />
                 </template>
             </FormRenderer>
+
+            <slot
+                name="aboveCriadoModificado"
+                :is-view="isView"
+            />
 
             <CriadoModificadoFields
                 v-if="isView"
@@ -63,40 +77,57 @@
                 :save="requestSave"
                 :cancel="cancel"
                 :is-view="isView"
+                :toggle-mode="toggleMode"
+                :show-mode-toggle="showModeToggle"
+                :mode-toggle-label="modeToggleLabel"
             >
-                <div class="flex flex-wrap justify-end gap-2">
-                    <template v-if="isView">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
                         <Button
-                            variant="primary"
+                            v-if="showModeToggle"
+
                             type="button"
-
-                            @click="cancel"
-                        >
-                            Fechar
-                        </Button>
-                    </template>
-
-                    <template v-else>
-                        <Button
-                            variant="primary"
-                            type="submit"
-
-                            :form="formId"
-                            :disabled="saving || submitDisabled"
-                        >
-                            Salvar
-                        </Button>
-
-                        <Button
                             variant="secondary"
-                            type="button"
-                            :disabled="saving || submitDisabled"
+                            size="small"
+                            :label="modeToggleLabel"
 
-                            @click="cancel"
-                        >
-                            Cancelar
-                        </Button>
-                    </template>
+                            @click="toggleMode"
+                        />
+                    </div>
+
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <template v-if="isView">
+                            <Button
+                                variant="primary"
+                                type="button"
+
+                                @click="cancel"
+                            >
+                                Fechar
+                            </Button>
+                        </template>
+
+                        <template v-else>
+                            <Button
+                                variant="primary"
+                                type="submit"
+                                :form="formId"
+                                :disabled="saving || submitDisabled"
+                            >
+                                Salvar
+                            </Button>
+
+                            <Button
+                                variant="secondary"
+                                type="button"
+                                :disabled="saving || submitDisabled"
+
+                                @click="cancel"
+                            >
+                                Cancelar
+                            </Button>
+                        </template>
+                    </div>
                 </div>
             </slot>
         </template>
@@ -111,12 +142,13 @@ import CriadoModificadoFields from "./CriadoModificadoFields.vue";
 
 type ItemMode = "view" | "edit" | "create";
 
-        type FormRendererExpose = {
-            submitForm: () => void;
-            applyFieldErrors: (errors: Record<string, string>) => void;
-            setFieldValue: (fieldId: string, value: unknown) => void;
-            getFieldValue: (fieldId: string) => unknown;
-        };
+type FormRendererExpose = {
+    submitForm: () => void;
+    applyFieldErrors: (errors: Record<string, string>) => void;
+    setFieldValue: (fieldId: string, value: unknown) => void;
+    getFieldValue: (fieldId: string) => unknown;
+    closeSelect: (fieldId: string) => void;
+};
 
 interface FormSection {
     key?: string;
@@ -194,6 +226,11 @@ export default defineComponent({
         formKey: {
             type: [String, Number],
             default: 0
+        },
+
+        hideModeToggle: {
+            type: Boolean,
+            default: false
         }
     },
 
@@ -201,6 +238,7 @@ export default defineComponent({
         "save",
         "cancel",
         "update:isOpen",
+        "update:mode",
         "click:select-action",
         "click:select-option",
         "click:select-remove",
@@ -210,6 +248,18 @@ export default defineComponent({
     computed: {
         isView(): boolean {
             return this.mode === "view";
+        },
+
+        showModeToggle(): boolean {
+            if (this.hideModeToggle) {
+                return false;
+            }
+
+            return this.mode === "view" || this.mode === "edit";
+        },
+
+        modeToggleLabel(): string {
+            return this.mode === "view" ? "Editar" : "Visualizar";
         },
 
         formId(): string {
@@ -232,6 +282,10 @@ export default defineComponent({
 
         getFieldValue(fieldId: string): unknown {
             return this.formRendererInstance()?.getFieldValue(fieldId);
+        },
+
+        closeSelect(fieldId: string) {
+            this.formRendererInstance()?.closeSelect(fieldId);
         },
 
         onSelectAction(payload: { id: string; field: FormField }) {
@@ -258,6 +312,17 @@ export default defineComponent({
             this.$emit("save", values);
         },
 
+        toggleMode() {
+            if (this.mode === "view") {
+                this.$emit("update:mode", "edit");
+                return;
+            }
+
+            if (this.mode === "edit") {
+                this.$emit("update:mode", "view");
+            }
+        },
+
         requestSave() {
             if (this.submitDisabled) {
                 return;
@@ -274,6 +339,10 @@ export default defineComponent({
 
         onOpenChange(open: boolean) {
             this.$emit("update:isOpen", open);
+
+            if (!open) {
+                this.$emit("cancel");
+            }
         }
     }
 });

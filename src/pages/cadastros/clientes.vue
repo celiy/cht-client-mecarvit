@@ -1,5 +1,7 @@
 <template>
     <CrudListPage
+        ref="listPage"
+
         title="Clientes"
         :filters="clienteFilters"
         :loading="loadingClientes"
@@ -9,8 +11,11 @@
         pagination-id="pagination-clientes"
         :pagination-key="filters || 'all'"
         delete-name-field="nome"
+        empty-title="Nenhum cliente encontrado."
+        empty-description="Ajuste os filtros ou cadastre um novo cliente."
 
         @create="onCreate"
+        @close-create="closeDialog"
         @filters="onFilters"
         @reload="getClientes"
         @page="onPage"
@@ -30,10 +35,143 @@
 
             @save="onSave"
             @cancel="closeDialog"
+            @update:mode="onDialogModeChange"
             @click:select-action="onClienteSelectAction"
             @click:select-option="onClienteChipClick"
             @click:select-remove="onClienteChipRemove"
             @search:external="onEnderecoSearchExternal"
+        >
+            <template
+                v-if="dialogMode !== 'view'"
+                #select-inside-empty-panel="{ field }"
+            >
+                <Button
+                    v-if="field.id === 'enderecoIds'"
+
+                    type="button"
+                    variant="outline"
+                    left-icon="fa-plus"
+                    label="Cadastrar endereço"
+
+                    @click="onClienteSelectInsideEmptyPanel('enderecoIds')"
+                />
+
+                <Button
+                    v-else-if="field.id === 'veiculoIds'"
+
+                    type="button"
+                    variant="outline"
+                    left-icon="fa-plus"
+                    label="Cadastrar veículo"
+
+                    @click="onClienteSelectInsideEmptyPanel('veiculoIds')"
+                />
+            </template>
+
+            <template
+                v-if="dialogMode === 'view'"
+                #aboveCriadoModificado
+            >
+                <section
+                    class="mt-4 border-t border-border pt-2"
+                    aria-labelledby="cliente-ordens-servico-heading"
+                >
+                    <h4
+                        id="cliente-ordens-servico-heading"
+                        class="mb-2"
+                    >
+                        Ordens de serviço
+                    </h4>
+
+                    <p
+                        v-if="clienteOrdensLoading"
+
+                        class="text-sm text-muted-foreground"
+                    >
+                        Carregando ordens de serviço…
+                    </p>
+
+                    <p
+                        v-else-if="clienteOrdens.length === 0"
+
+                        class="text-sm text-muted-foreground"
+                    >
+                        Nenhuma ordem de serviço para este cliente.
+                    </p>
+
+                    <div
+                        v-else
+
+                        class="flex flex-col gap-2"
+                    >
+                        <Button
+                            v-for="os in clienteOrdens"
+                            :key="os.id"
+
+                            :label="clienteOrdemRowLabel(os)"
+
+                            @click="openClienteOsView(os.id)"
+                        />
+                    </div>
+                </section>
+            </template>
+        </ItemViewEdit>
+
+        <Modal
+            ref="clienteOsModal"
+
+            :is-open="clienteOsDialogOpen"
+            size="extra-large"
+
+            @update:value="onClienteOsDialogOpenChange"
+        >
+            <template #header>
+                {{ clienteOsDialogHeader }}
+            </template>
+
+            <template #body>
+                <OrdemServicoForm
+                    v-if="clienteOsDialogOpen"
+                    :key="clienteOsDialogKey"
+                    ref="clienteOsForm"
+
+                    :form-id="clienteOsFormId"
+                    mode="view"
+                    :values="clienteOsDialogItem"
+                    :cliente-options="clienteOsClienteOptions"
+                    :veiculo-options="clienteOsVeiculoOptions"
+                    :funcionario-options="clienteOsFuncionarioOptions"
+                    :status-options="clienteOsStatusOptions"
+                    :servico-suggestions="[]"
+                    pagamentos-button-label="Ver pagamentos"
+                    :pagamentos="clienteOsDialogPagamentos"
+
+                    @click:pagamentos="openClienteOsPagamentos"
+                />
+            </template>
+
+            <template #footer>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <Button
+                        variant="primary"
+                        type="button"
+
+                        @click="closeClienteOsDialog"
+                    >
+                        Fechar
+                    </Button>
+                </div>
+            </template>
+        </Modal>
+
+        <PagamentosModal
+            v-model:is-open="clienteOsPaymentModalOpen"
+            :saving="false"
+            :valor-total="clienteOsPaymentValorTotal"
+            :rows="clienteOsPaymentRows"
+            readonly
+
+            @cancel="onClienteOsPaymentModalCancel"
         />
 
         <ItemViewEdit
@@ -73,9 +211,22 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import { toQueryString } from "@shared/frontend/queryString";
+import Button from "@design/components/Button.vue";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
+import PagamentosModal from "../../components/PagamentosModal.vue";
+import OrdemServicoForm, {
+    emptyOrdemServicoFormValues,
+    type OrdemServicoFormValues,
+    type VeiculoSelectOption
+} from "../../components/OrdemServicoForm.vue";
+import type { PagamentoFormRow } from "../../js/pagamentoOptions";
+import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
+import { toOsForm, type OrdemServicoApi } from "../../js/ordemServicoFormMap";
+import { formatTableLabel } from "../../js/formatTableLabel";
+import { osStatusIndicator } from "../../js/osStatusBadge";
+import { parseMoneyInput } from "@shared/format/moneyInput";
 import {
     clienteFormFields,
     clienteNomeSocialForSave,
@@ -98,8 +249,19 @@ import {
     type DialogMode,
     type ItemResponse,
     type ItemViewEditExpose,
-    type ListResponse
+    type ListResponse,
+    withSelectedItem
 } from "../../js/crudHttp";
+
+interface StatusOsApi {
+    id: number;
+    nome: string;
+}
+
+interface UsuarioApi {
+    cpf: string;
+    nome: string;
+}
 
 interface VeiculoApi {
     id?: number;
@@ -227,8 +389,11 @@ export default defineComponent({
     name: "MecarvitClientesPage",
 
     components: {
+        Button,
         CrudListPage,
-        ItemViewEdit
+        ItemViewEdit,
+        OrdemServicoForm,
+        PagamentosModal
     },
 
     data() {
@@ -256,6 +421,7 @@ export default defineComponent({
             dialogSaving: false,
             dialogMode: "view" as DialogMode,
             dialogItem: emptyClienteForm() as ClienteFormValues,
+            dialogOriginalItem: emptyClienteForm() as ClienteFormValues,
             dialogKey: 0,
             dialogVehicles: [] as VeiculoApi[],
             allEnderecos: [] as EnderecoApi[],
@@ -276,7 +442,20 @@ export default defineComponent({
             pendingVeiculoSeq: 0,
             page: 1,
             pageLimit: 10,
-            pageCount: 0
+            pageCount: 0,
+            clienteOrdens: [] as OrdemServicoApi[],
+            clienteOrdensLoading: false,
+            clienteOrdensSeq: 0,
+            osStatusList: [] as StatusOsApi[],
+            clienteOsFormId: "cliente-os-form",
+            clienteOsDialogOpen: false,
+            clienteOsDialogKey: 0,
+            clienteOsDialogItem: emptyOrdemServicoFormValues() as OrdemServicoFormValues,
+            clienteOsDialogPagamentos: [] as PagamentoFormRow[],
+            clienteOsFormFuncionarios: [] as UsuarioApi[],
+            clienteOsPaymentModalOpen: false,
+            clienteOsPaymentRows: [] as PagamentoFormRow[],
+            clienteOsPaymentValorTotal: 0
         };
     },
 
@@ -361,6 +540,71 @@ export default defineComponent({
                 clienteOptions: [],
                 showCliente: false
             });
+        },
+
+        osStatusNameById(): Record<number, string> {
+            const map: Record<number, string> = {};
+
+            for (const status of this.osStatusList) {
+                map[status.id] = status.nome;
+            }
+
+            return map;
+        },
+
+        clienteOsDialogHeader(): string {
+            if (this.clienteOsDialogItem.id) {
+                return `OS #${this.clienteOsDialogItem.id}`;
+            }
+
+            return "Ordem de serviço";
+        },
+
+        clienteOsClienteOptions() {
+            const documento = documentDigits(this.dialogItem.documento);
+
+            if (!documento) {
+                return [];
+            }
+
+            return [
+                {
+                    label: this.dialogItem.nome || documento,
+                    value: documento,
+                    cel: this.dialogItem.cel ?? ""
+                }
+            ];
+        },
+
+        clienteOsVeiculoOptions(): VeiculoSelectOption[] {
+            return this.dialogVehicles.map((veiculo) => ({
+                label: `${veiculo.modelo} · ${veiculo.placa}`,
+                value: String(veiculo.id),
+                clienteDocumento:
+                    veiculo.clienteDocumento ?? documentDigits(this.dialogItem.documento),
+                modelo: veiculo.modelo,
+                placa: veiculo.placa,
+                kilometragem:
+                    veiculo.kilometragem != null && veiculo.kilometragem !== 0
+                        ? String(veiculo.kilometragem)
+                        : "",
+                tipo: veiculo.tipo ?? ""
+            }));
+        },
+
+        clienteOsFuncionarioOptions() {
+            return this.clienteOsFormFuncionarios.map((usuario) => ({
+                label: usuario.nome,
+                value: documentDigits(usuario.cpf)
+            }));
+        },
+
+        clienteOsStatusOptions() {
+            return this.osStatusList.map((status) => ({
+                label: formatTableLabel(status.nome),
+                value: String(status.id),
+                indicator: osStatusIndicator(status.id)
+            }));
         }
     },
 
@@ -384,8 +628,220 @@ export default defineComponent({
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
+            this.clienteOrdens = [];
+            this.clienteOrdensLoading = false;
+            this.clienteOrdensSeq += 1;
+            this.closeClienteOsDialog();
             this.closeVeiculoDialog();
             this.closeEnderecoDialog();
+            void this.$refs.listPage?.clearCadastrarQuery?.();
+        },
+
+        onDialogModeChange(mode: DialogMode) {
+            if (this.dialogMode === "view" && mode === "edit") {
+                this.dialogOriginalItem = JSON.parse(JSON.stringify(this.dialogItem));
+            }
+
+            if (this.dialogMode === "edit" && mode === "view") {
+                this.dialogItem = JSON.parse(JSON.stringify(this.dialogOriginalItem));
+                this.dialogKey += 1;
+            }
+
+            this.dialogMode = mode;
+        },
+
+        clienteOrdemRowLabel(os: OrdemServicoApi): string {
+            const veiculo = this.dialogVehicles.find((entry) => entry.id === os.veiculoId);
+            const veiculoLabel = veiculo
+                ? `${veiculo.modelo} · ${veiculo.placa}`
+                : `Veículo #${os.veiculoId}`;
+            const statusName = os.status?.nome ?? this.osStatusNameById[os.statusOsId] ?? "—";
+
+            return `OS #${os.id} · ${formatTableLabel(statusName)} · ${veiculoLabel}`;
+        },
+
+        async ensureOsStatusLoaded() {
+            if (this.osStatusList.length > 0) {
+                return;
+            }
+
+            try {
+                const response = await this.$http.get<ListResponse<StatusOsApi>>(
+                    "/api/status-os?limit=100"
+                );
+                this.osStatusList = response.data.data ?? [];
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível carregar os status da OS.");
+            }
+        },
+
+        async loadClienteOrdens(documento: string) {
+            this.clienteOrdensSeq += 1;
+            const seq = this.clienteOrdensSeq;
+            this.clienteOrdensLoading = true;
+            this.clienteOrdens = [];
+
+            try {
+                const query = toQueryString({
+                    cliente: documento,
+                    limit: 50,
+                    sort: "-id"
+                });
+                const response = await this.$http.get<ListResponse<OrdemServicoApi>>(
+                    `/api/ordem-servico?${query}`
+                );
+
+                if (seq !== this.clienteOrdensSeq) {
+                    return;
+                }
+
+                this.clienteOrdens = response.data.data ?? [];
+            } catch (error) {
+                if (seq !== this.clienteOrdensSeq) {
+                    return;
+                }
+
+                notifyHttpError(
+                    this.$toast,
+                    error,
+                    "Não foi possível carregar as ordens de serviço do cliente."
+                );
+                this.clienteOrdens = [];
+            } finally {
+                if (seq === this.clienteOrdensSeq) {
+                    this.clienteOrdensLoading = false;
+                }
+            }
+        },
+
+        closeClienteOsDialog() {
+            this.clienteOsDialogOpen = false;
+            this.clienteOsDialogPagamentos = [];
+            this.clienteOsFormFuncionarios = [];
+            this.onClienteOsPaymentModalCancel();
+        },
+
+        onClienteOsDialogOpenChange(open: boolean) {
+            this.clienteOsDialogOpen = open;
+
+            if (!open) {
+                this.closeClienteOsDialog();
+            }
+        },
+
+        clienteOsFormRef(): { getFieldValue: (fieldId: string) => unknown } | undefined {
+            return this.$refs.clienteOsForm as
+                { getFieldValue: (fieldId: string) => unknown } | undefined;
+        },
+
+        clienteOsValorTotalFromForm(): number {
+            const itens =
+                (this.clienteOsFormRef()?.getFieldValue("itens") as
+                    OrdemServicoItemFormRow[] | undefined) ??
+                this.clienteOsDialogItem.itens ??
+                [];
+
+            return itens.reduce((sum, item) => {
+                const qty = Number(item.quantidade);
+                const obra = parseMoneyInput(item.valorObra) ?? 0;
+                const pecas = parseMoneyInput(item.valorPecas) ?? 0;
+                const quantidade = Number.isFinite(qty) && qty > 0 ? qty : 0;
+
+                return sum + quantidade * (obra + pecas);
+            }, 0);
+        },
+
+        openClienteOsPagamentos() {
+            this.clienteOsPaymentRows = [...this.clienteOsDialogPagamentos];
+            this.clienteOsPaymentValorTotal = this.clienteOsValorTotalFromForm();
+            this.clienteOsPaymentModalOpen = true;
+        },
+
+        onClienteOsPaymentModalCancel() {
+            this.clienteOsPaymentModalOpen = false;
+            this.clienteOsPaymentRows = [];
+            this.clienteOsPaymentValorTotal = 0;
+        },
+
+        async ensureClienteOsFuncionariosForCpfs(cpfs: string[]) {
+            for (const rawCpf of cpfs) {
+                const cpf = documentDigits(rawCpf);
+
+                if (!cpf) {
+                    continue;
+                }
+
+                const exists = this.clienteOsFormFuncionarios.some(
+                    (usuario) => documentDigits(usuario.cpf) === cpf
+                );
+
+                if (exists) {
+                    continue;
+                }
+
+                try {
+                    const response = await this.$http.get<ItemResponse<UsuarioApi>>(
+                        `/api/usuario/${cpf}`
+                    );
+                    const usuario = response.data.data;
+
+                    if (!usuario?.cpf) {
+                        continue;
+                    }
+
+                    this.clienteOsFormFuncionarios = withSelectedItem(
+                        this.clienteOsFormFuncionarios,
+                        usuario,
+                        (entry) => documentDigits(entry.cpf)
+                    );
+                } catch {
+                    // Responsável pode ter sido desativado; mantém só o CPF no formulário.
+                }
+            }
+        },
+
+        async openClienteOsView(osId: number) {
+            if (!Number.isInteger(osId) || osId <= 0) {
+                return;
+            }
+
+            try {
+                const response = await this.$http.get<ItemResponse<OrdemServicoApi>>(
+                    `/api/ordem-servico/${osId}`
+                );
+                const os = response.data.data;
+                const veiculo = this.dialogVehicles.find((entry) => entry.id === os.veiculoId);
+
+                this.clienteOsDialogKey += 1;
+                this.clienteOsDialogItem = toOsForm(
+                    os,
+                    {
+                        nome: this.dialogItem.nome,
+                        cel: this.dialogItem.cel
+                    },
+                    veiculo
+                );
+                this.clienteOsDialogPagamentos = (os.pagamentos ?? []).map((row) => ({
+                    id: row.id,
+                    tipo: row.tipo,
+                    valor: String(row.valor),
+                    criadoEm: row.criadoEm,
+                    modificadoEm: row.modificadoEm
+                }));
+                this.clienteOsFormFuncionarios = [];
+
+                await this.ensureClienteOsFuncionariosForCpfs(
+                    this.clienteOsDialogItem.responsaveisCpfs ?? []
+                );
+
+                this.clienteOsDialogOpen = true;
+            } catch (error) {
+                notifyHttpError(
+                    this.$toast,
+                    error,
+                    "Não foi possível carregar a ordem de serviço."
+                );
+            }
         },
 
         closeEnderecoDialog() {
@@ -518,6 +974,7 @@ export default defineComponent({
             this.dialogKey += 1;
             this.dialogMode = mode;
             this.dialogItem = item;
+            this.dialogOriginalItem = JSON.parse(JSON.stringify(item));
             this.dialogVehicles = veiculos;
             this.dialogSaving = false;
             this.dialogOpen = true;
@@ -547,6 +1004,15 @@ export default defineComponent({
                 this.pendingVeiculos = [];
                 this.mergeEnderecosIntoCatalog(cliente.enderecos ?? []);
                 this.openDialog(mode, toClienteForm(cliente), cliente.veiculos ?? []);
+
+                if (mode === "view") {
+                    await this.ensureOsStatusLoaded();
+                    await this.loadClienteOrdens(documento);
+                } else {
+                    this.clienteOrdens = [];
+                    this.clienteOrdensLoading = false;
+                    this.clienteOrdensSeq += 1;
+                }
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar o cliente.");
             }
@@ -662,12 +1128,22 @@ export default defineComponent({
                 return;
             }
 
-            if (payload.id === "veiculoIds") {
+            this.onClienteSelectInsideEmptyPanel(payload.id);
+        },
+
+        onClienteSelectInsideEmptyPanel(fieldId: string) {
+            if (this.dialogMode === "view") {
+                return;
+            }
+
+            this.itemDialog()?.closeSelect(fieldId);
+
+            if (fieldId === "veiculoIds") {
                 this.openVeiculoCreateDialog();
                 return;
             }
 
-            if (payload.id === "enderecoIds") {
+            if (fieldId === "enderecoIds") {
                 this.openEnderecoCreateDialog();
             }
         },

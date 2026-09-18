@@ -69,6 +69,37 @@ export function setCurrentUser(user: MecarvitUser | null): void {
     mecarvit.user = user;
 }
 
+export function currentUsuarioCpfDigits(): string {
+    const cpf = mecarvit.user?.cpf ?? "";
+
+    return cpf.replace(/\D/g, "");
+}
+
+export function isSuperadminNivelAcesso(nivelAcesso: string | undefined): boolean {
+    return String(nivelAcesso ?? "").includes("0");
+}
+
+export function isUsuarioSuperadmin(user: {
+    fundador?: boolean;
+    nivelAcesso?: string;
+}): boolean {
+    return Boolean(user.fundador) || isSuperadminNivelAcesso(user.nivelAcesso);
+}
+
+export function excludeSuperadminCargos<T extends { nivelAcesso?: string }>(cargos: T[]): T[] {
+    return cargos.filter((cargo) => !isSuperadminNivelAcesso(cargo.nivelAcesso));
+}
+
+export function excludeCurrentUsuario<T extends { cpf: string }>(users: T[]): T[] {
+    const current = currentUsuarioCpfDigits();
+
+    if (!current) {
+        return users;
+    }
+
+    return users.filter((usuario) => usuario.cpf.replace(/\D/g, "") !== current);
+}
+
 export function setCurrentCompany(company: MecarvitCompany | null): void {
     mecarvit.company = company;
 }

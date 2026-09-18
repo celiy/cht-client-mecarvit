@@ -1,5 +1,6 @@
 <template>
     <CrudListPage
+        ref="listPage"
         title="Veículos"
         :filters="veiculoFilters"
         :loading="loadingVeiculos"
@@ -10,8 +11,11 @@
         :pagination-key="filters || 'all'"
         delete-name-field="modelo"
         :filter-select-options="filterSelectOptions"
+        empty-title="Nenhum veículo encontrado."
+        empty-description="Ajuste os filtros ou cadastre um novo veículo."
 
         @create="onCreate"
+        @close-create="closeDialog"
         @filters="onFilters"
         @reload="getVeiculos"
         @page="onPage"
@@ -31,6 +35,7 @@
 
             @save="onSave"
             @cancel="closeDialog"
+            @update:mode="onDialogModeChange"
             @search:external="onSearchExternal"
         />
     </CrudListPage>
@@ -145,6 +150,7 @@ export default defineComponent({
             dialogSaving: false,
             dialogMode: "view" as DialogMode,
             dialogItem: emptyVeiculoForm() as VeiculoFormValues,
+            dialogOriginalItem: emptyVeiculoForm() as VeiculoFormValues,
             dialogKey: 0,
             clienteSearchSeq: 0,
             page: 1,
@@ -240,6 +246,20 @@ export default defineComponent({
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
+            void this.$refs.listPage?.clearCadastrarQuery?.();
+        },
+
+        onDialogModeChange(mode: DialogMode) {
+            if (this.dialogMode === "view" && mode === "edit") {
+                this.dialogOriginalItem = JSON.parse(JSON.stringify(this.dialogItem));
+            }
+
+            if (this.dialogMode === "edit" && mode === "view") {
+                this.dialogItem = JSON.parse(JSON.stringify(this.dialogOriginalItem));
+                this.dialogKey += 1;
+            }
+
+            this.dialogMode = mode;
         },
 
         onFilters(values: FilterValues) {
@@ -375,6 +395,7 @@ export default defineComponent({
             this.dialogKey += 1;
             this.dialogMode = mode;
             this.dialogItem = item;
+            this.dialogOriginalItem = JSON.parse(JSON.stringify(item));
             this.dialogSaving = false;
             this.dialogOpen = true;
 

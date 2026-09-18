@@ -87,6 +87,7 @@ export function clienteFormFields(options: {
     fields.push({
         id: "enderecoIds",
         label: "Endereços",
+        placeholder: "Selecione os endereços",
         type: "select",
         options: options.enderecoOptions ?? [],
         selectMultiple: { min: 0 },
@@ -107,6 +108,7 @@ export function clienteFormFields(options: {
         fields.push({
             id: "veiculoIds",
             label: "Veículos",
+            placeholder: "Selecione os veículos",
             type: "select",
             options: options.veiculoOptions,
             selectMultiple: { min: 0 },
@@ -125,7 +127,8 @@ export function clienteFormFields(options: {
             id: "ativo",
             label: "Ativo",
             type: "checkbox",
-            checkboxStyle: "switch"
+            checkboxStyle: "switch",
+            description: "Quando desativado, a entidade não será indexada nem poderá ser usada. Isso funciona como exclusão lógica, sem perder os dados."
         });
     }
 
@@ -184,6 +187,7 @@ export function veiculoFormFields(options: {
         fields.push({
             id: "clienteDocumento",
             label: "Cliente",
+            placeholder: "Selecione o cliente",
             type: "select",
             required: true,
             options: options.clienteOptions,
@@ -234,7 +238,8 @@ export function veiculoFormFields(options: {
             id: "ativo",
             label: "Ativo",
             type: "checkbox",
-            checkboxStyle: "switch"
+            checkboxStyle: "switch",
+            description: "Quando desativado, a entidade não será indexada nem poderá ser usada. Isso funciona como exclusão lógica, sem perder os dados."
         });
     }
 
@@ -384,6 +389,7 @@ export function registroFormFields(options?: {
         {
             id: "tipo",
             label: "Tipo",
+            placeholder: "Selecione o tipo",
             type: "select",
             required: true,
             readonly: lockTipo,

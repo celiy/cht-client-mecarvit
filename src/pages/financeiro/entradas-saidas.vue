@@ -6,6 +6,7 @@
         :show-filters="false"
 
         @create="onCreate"
+        @close-create="closeDialog"
         @delete="onDelete"
     >
         <template #body>
@@ -34,7 +35,14 @@
                     :loading="loadingEntradas"
 
                     @click:action="onSectionAction"
-                />
+                >
+                    <template #empty>
+                        <EmptyTableMessage
+                            title="Nenhum lançamento encontrado."
+                            description="Ajuste os filtros ou cadastre um novo lançamento."
+                        />
+                    </template>
+                </Table>
 
                 <Pagination
                     id="pagination-entradas"
@@ -72,7 +80,14 @@
                     :loading="loadingSaidas"
 
                     @click:action="onSectionAction"
-                />
+                >
+                    <template #empty>
+                        <EmptyTableMessage
+                            title="Nenhum lançamento encontrado."
+                            description="Ajuste os filtros ou cadastre um novo lançamento."
+                        />
+                    </template>
+                </Table>
 
                 <Pagination
                     id="pagination-saidas"
@@ -102,9 +117,10 @@
 
             @save="onSave"
             @cancel="closeDialog"
+            @update:mode="onDialogModeChange"
         >
             <template
-                v-if="dialogMode !== 'view'"
+                v-if="dialogMode === 'create' || dialogMode === 'edit' || dialogMode === 'view'"
                 #belowForm
             >
                 <div class="mt-4">
@@ -122,26 +138,41 @@
 
             <template
                 v-if="linkedOrdemServicoId && dialogMode === 'view'"
-                #actions="{ cancel }"
+                #actions="{ cancel, toggleMode, showModeToggle, modeToggleLabel }"
             >
-                <div class="flex flex-wrap justify-end gap-2">
-                    <Button
-                        variant="info"
-                        type="button"
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <Button
+                            v-if="showModeToggle"
 
-                        @click="openLinkedOrdemServico"
-                    >
-                        Ver ordem de serviço
-                    </Button>
+                            type="button"
+                            variant="secondary"
+                            size="small"
+                            :label="modeToggleLabel"
 
-                    <Button
-                        variant="primary"
-                        type="button"
+                            @click="toggleMode"
+                        />
+                    </div>
 
-                        @click="cancel"
-                    >
-                        Fechar
-                    </Button>
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <Button
+                            variant="info"
+                            type="button"
+
+                            @click="openLinkedOrdemServico"
+                        >
+                            Ver ordem de serviço
+                        </Button>
+
+                        <Button
+                            variant="primary"
+                            type="button"
+
+                            @click="cancel"
+                        >
+                            Fechar
+                        </Button>
+                    </div>
                 </div>
             </template>
         </ItemViewEdit>
@@ -166,6 +197,7 @@
                     :values="osDialogItem"
                     :cliente-options="osClienteOptions"
                     :veiculo-options="osVeiculoSelectOptions"
+                    :funcionario-options="osFuncionarioSelectOptions"
                     :pagamentos="osDialogPagamentos"
                 />
             </template>
@@ -204,6 +236,7 @@ import Button from "@design/components/Button.vue";
 import Pagination from "@design/components/custom/Pagination.vue";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import FilterInputs from "../../components/FilterInputs.vue";
+import EmptyTableMessage from "../../components/EmptyTableMessage.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
 import OrdemServicoForm, {
@@ -221,6 +254,7 @@ import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyI
 import { sumPagamentosValor, type PagamentoFormRow } from "../../js/pagamentoOptions";
 import {
     CRUD_ROW_ACTIONS_WITH_PAGAMENTO,
+    documentDigits,
     formatMoneyBrl,
     listQuery,
     notifyHttpError,
@@ -230,6 +264,7 @@ import {
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
+import { excludeCurrentUsuario } from "../../js/mecarvit";
 
 interface OrdemServicoLinkApi {
     id: number;
@@ -294,6 +329,12 @@ interface OrdemServicoApi {
     obs?: string | null;
     itens?: OrdemServicoItemApi[];
     pagamentos?: PagamentoApi[];
+    responsaveis?: string[];
+}
+
+interface UsuarioApi {
+    cpf: string;
+    nome: string;
 }
 
 function mapOsItensFromApi(itens: OrdemServicoItemApi[] | undefined): OrdemServicoItemFormRow[] {
@@ -374,6 +415,7 @@ function toOsForm(
         diagnosticoCliente: os.diagnosticoCliente ?? "",
         diagnosticoMecanico: os.diagnosticoMecanico ?? "",
         obs: os.obs ?? "",
+        responsaveisCpfs: (os.responsaveis ?? []).map((cpf) => String(cpf).trim()).filter(Boolean),
         itens: mapOsItensFromApi(os.itens)
     };
 }
@@ -396,6 +438,7 @@ export default defineComponent({
     components: {
         Button,
         CrudListPage,
+        EmptyTableMessage,
         FilterInputs,
         ItemViewEdit,
         OrdemServicoForm,
@@ -430,6 +473,7 @@ export default defineComponent({
             dialogSaving: false,
             dialogMode: "view" as DialogMode,
             dialogItem: emptyRegistroForm() as RegistroFormValues,
+            dialogOriginalItem: emptyRegistroForm() as RegistroFormValues,
             dialogKey: 0,
             linkedOrdemServicoId: null as number | null,
             lockValorFromOs: false,
@@ -441,6 +485,7 @@ export default defineComponent({
             osDialogPagamentos: [] as PagamentoFormRow[],
             osClientes: [] as ClienteApi[],
             osVeiculos: [] as VeiculoApi[],
+            osFuncionarios: [] as UsuarioApi[],
             dialogPagamentos: [] as PagamentoFormRow[],
             paymentModalOpen: false,
             paymentSaving: false,
@@ -564,6 +609,13 @@ export default defineComponent({
                         : "",
                 tipo: veiculo.tipo ?? ""
             }));
+        },
+
+        osFuncionarioSelectOptions() {
+            return this.osFuncionarios.map((usuario) => ({
+                label: usuario.nome,
+                value: documentDigits(usuario.cpf)
+            }));
         }
     },
 
@@ -597,13 +649,26 @@ export default defineComponent({
             return sumPagamentosValor(rows);
         },
 
+        currentDialogItemValues(): RegistroFormValues {
+            const next = { ...this.dialogItem };
+
+            for (const fieldId of ["id", "criadoEm", "modificadoEm", "tipo", "nome", "valor", "valorPago", "descricao"]) {
+                const value = this.itemDialog()?.getFieldValue(fieldId);
+
+                if (value !== undefined) {
+                    next[fieldId as keyof RegistroFormValues] = value as never;
+                }
+            }
+
+            return next;
+        },
+
         syncDialogValorPago() {
             const label = formatMoneyBrl(this.pagamentosValorFromFormRows(this.dialogPagamentos));
+            const nextItem = this.currentDialogItemValues();
 
-            this.dialogItem = {
-                ...this.dialogItem,
-                valorPago: label
-            };
+            nextItem.valorPago = label;
+            this.dialogItem = nextItem;
             this.itemDialog()?.setFieldValue("valorPago", label);
         },
 
@@ -663,6 +728,20 @@ export default defineComponent({
             this.lockValorFromOs = false;
             this.lockTipoFromOs = false;
             this.dialogPagamentos = [];
+            void this.$refs.listPage?.clearCadastrarQuery?.();
+        },
+
+        onDialogModeChange(mode: DialogMode) {
+            if (this.dialogMode === "view" && mode === "edit") {
+                this.dialogOriginalItem = JSON.parse(JSON.stringify(this.dialogItem));
+            }
+
+            if (this.dialogMode === "edit" && mode === "view") {
+                this.dialogItem = JSON.parse(JSON.stringify(this.dialogOriginalItem));
+                this.dialogKey += 1;
+            }
+
+            this.dialogMode = mode;
         },
 
         mapPagamentosFromApi(pagamentos: PagamentoApi[] | undefined): PagamentoFormRow[] {
@@ -789,7 +868,7 @@ export default defineComponent({
                 this.dialogPagamentos = this.mapPagamentosToFormRows(pagamentos);
                 this.syncDialogValorPago();
                 this.onPaymentModalCancel();
-                this.$toast.success("Pagamentos atualizados no lançamento.");
+                this.$toast.success("Pagamentos adicionados ao lançamento. Salve o lançamento quando terminar.");
 
                 return;
             }
@@ -833,6 +912,7 @@ export default defineComponent({
             this.osDialogOpen = false;
             this.osDialogPagamentos = [];
             this.osDialogItem = emptyOrdemServicoFormValues();
+            this.osFuncionarios = [];
         },
 
         onOsDialogOpenChange(open: boolean) {
@@ -841,7 +921,46 @@ export default defineComponent({
             if (!open) {
                 this.osDialogPagamentos = [];
                 this.osDialogItem = emptyOrdemServicoFormValues();
+                this.osFuncionarios = [];
             }
+        },
+
+        async loadOsFuncionarios(
+            base: UsuarioApi[],
+            responsaveisCpfs: string[]
+        ): Promise<UsuarioApi[]> {
+            const byCpf = new Map<string, UsuarioApi>();
+
+            for (const usuario of base) {
+                const cpf = usuario.cpf.replace(/\D/g, "");
+
+                if (cpf) {
+                    byCpf.set(cpf, usuario);
+                }
+            }
+
+            for (const rawCpf of responsaveisCpfs) {
+                const cpf = rawCpf.replace(/\D/g, "");
+
+                if (!cpf || byCpf.has(cpf)) {
+                    continue;
+                }
+
+                try {
+                    const response = await this.$http.get<ItemResponse<UsuarioApi>>(
+                        `/api/usuario/${cpf}`
+                    );
+                    const usuario = response.data.data;
+
+                    if (usuario?.cpf) {
+                        byCpf.set(cpf, usuario);
+                    }
+                } catch {
+                    // Mantém só o CPF na visualização.
+                }
+            }
+
+            return [...byCpf.values()];
         },
 
         applyRegistroLocks(registro: RegistroApi) {
@@ -862,13 +981,16 @@ export default defineComponent({
             }
 
             try {
-                const [osResponse, clientes, veiculos] = await Promise.all([
+                const [osResponse, clientes, veiculos, usuarios] = await Promise.all([
                     this.$http.get<ItemResponse<OrdemServicoApi>>(`/api/ordem-servico/${id}`),
                     this.$http.get<ListResponse<ClienteApi>>(
                         "/api/cliente?limit=100&ativo=ativo,inativo"
                     ),
                     this.$http.get<ListResponse<VeiculoApi>>(
                         "/api/veiculo?limit=100&ativo=ativo,inativo"
+                    ),
+                    this.$http.get<ListResponse<UsuarioApi>>(
+                        "/api/usuario?limit=100&ativo=ativo,inativo"
                     )
                 ]);
 
@@ -876,6 +998,10 @@ export default defineComponent({
 
                 this.osClientes = clientes.data.data ?? [];
                 this.osVeiculos = veiculos.data.data ?? [];
+                this.osFuncionarios = await this.loadOsFuncionarios(
+                    excludeCurrentUsuario(usuarios.data.data ?? []),
+                    os.responsaveis ?? []
+                );
                 const cliente = this.osClientes.find(
                     (entry) => entry.documento === os.clienteDocumento
                 );
@@ -1018,6 +1144,7 @@ export default defineComponent({
             this.dialogKey += 1;
             this.dialogMode = mode;
             this.dialogItem = item;
+            this.dialogOriginalItem = JSON.parse(JSON.stringify(item));
             this.dialogSaving = false;
             this.dialogOpen = true;
         },

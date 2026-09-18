@@ -1,5 +1,6 @@
 <template>
     <CrudListPage
+        ref="listPage"
         title="Funcionários"
         :filters="funcionarioFilters"
         :loading="loadingFuncionarios"
@@ -9,8 +10,11 @@
         pagination-id="pagination-funcionarios"
         :pagination-key="filters || 'all'"
         delete-name-field="nome"
+        empty-title="Nenhum funcionário encontrado."
+        empty-description="Ajuste os filtros ou cadastre um novo funcionário."
 
         @create="onCreate"
+        @close-create="closeDialog"
         @filters="onFilters"
         @reload="getFuncionarios"
         @page="onPage"
@@ -26,9 +30,11 @@
             :fields="dialogFields"
             :saving="dialogSaving"
             :form-key="dialogKey"
+            :hide-mode-toggle="dialogUsuarioSuperadmin"
 
             @save="onSave"
             @cancel="closeDialog"
+            @update:mode="onDialogModeChange"
             @click:select-action="onUsuarioSelectAction"
             @search:external="onSearchExternal"
         />
@@ -70,6 +76,11 @@ import {
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
+import {
+    excludeCurrentUsuario,
+    excludeSuperadminCargos,
+    isUsuarioSuperadmin
+} from "../../js/mecarvit";
 
 interface UsuarioApi {
     cpf: string;
@@ -78,6 +89,8 @@ interface UsuarioApi {
     nome: string;
     email: string;
     ativo: boolean;
+    fundador?: boolean;
+    nivelAcesso?: string;
     cargoId: number;
     cargoNome?: string;
 }
@@ -96,6 +109,7 @@ interface FuncionarioFormValues {
     cpf: string;
     senha: string;
     cargoId: string;
+    cargoNome?: string;
     ativo: boolean;
 }
 
@@ -131,6 +145,7 @@ function toFormValues(user: UsuarioApi): FuncionarioFormValues {
         cpf: user.cpf ?? "",
         senha: "",
         cargoId: user.cargoId != null ? String(user.cargoId) : "",
+        cargoNome: user.cargoNome ?? "",
         ativo: Boolean(user.ativo)
     };
 }
@@ -168,6 +183,7 @@ export default defineComponent({
             dialogSaving: false,
             dialogMode: "view" as DialogMode,
             dialogItem: emptyFormValues() as FuncionarioFormValues,
+            dialogOriginalItem: emptyFormValues() as FuncionarioFormValues,
             dialogKey: 0,
             cargoDialogOpen: false,
             cargoSaving: false,
@@ -176,7 +192,8 @@ export default defineComponent({
             cargoSearchSeq: 0,
             page: 1,
             pageLimit: 10,
-            pageCount: 0
+            pageCount: 0,
+            dialogUsuarioSuperadmin: false
         };
     },
 
@@ -194,7 +211,7 @@ export default defineComponent({
         },
 
         cargoOptions() {
-            return this.cargos.map((cargo) => ({
+            return excludeSuperadminCargos(this.cargos).map((cargo) => ({
                 label: cargo.nome,
                 value: String(cargo.id)
             }));
@@ -235,31 +252,42 @@ export default defineComponent({
                 });
             }
 
-            fields.push({
-                id: "cargoId",
-                label: "Cargo",
-                type: "select",
-                required: true,
-                options: this.cargoOptions,
-                selectSearch: {
-                    external: true,
-                    field: "nome"
-                },
-                selectAction: this.dialogMode === "view"
-                    ? undefined
-                    : {
-                        icon: "fa-plus",
-                        side: "right",
-                        tooltip: "Cadastrar cargo"
-                    }
-            });
+            if (this.dialogUsuarioSuperadmin) {
+                fields.push({
+                    id: "cargoNome",
+                    label: "Cargo",
+                    type: "text",
+                    readonly: true
+                });
+            } else {
+                fields.push({
+                    id: "cargoId",
+                    label: "Cargo",
+                    placeholder: "Selecione o cargo",
+                    type: "select",
+                    required: true,
+                    options: this.cargoOptions,
+                    selectSearch: {
+                        external: true,
+                        field: "nome"
+                    },
+                    selectAction: this.dialogMode === "view"
+                        ? undefined
+                        : {
+                            icon: "fa-plus",
+                            side: "right",
+                            tooltip: "Cadastrar cargo"
+                        }
+                });
+            }
 
             if (!isCreate) {
                 fields.push({
                     id: "ativo",
                     label: "Ativo",
                     type: "checkbox",
-                    checkboxStyle: "switch"
+                    checkboxStyle: "switch",
+                    description: "Quando desativado, a entidade não será indexada nem poderá ser usada. Isso funciona como exclusão lógica, sem perder os dados."
                 });
             }
 
@@ -310,7 +338,26 @@ export default defineComponent({
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
+            this.dialogUsuarioSuperadmin = false;
             this.closeCargoDialog();
+            void this.$refs.listPage?.clearCadastrarQuery?.();
+        },
+
+        onDialogModeChange(mode: DialogMode) {
+            if (this.dialogUsuarioSuperadmin && mode === "edit") {
+                return;
+            }
+
+            if (this.dialogMode === "view" && mode === "edit") {
+                this.dialogOriginalItem = JSON.parse(JSON.stringify(this.dialogItem));
+            }
+
+            if (this.dialogMode === "edit" && mode === "view") {
+                this.dialogItem = JSON.parse(JSON.stringify(this.dialogOriginalItem));
+                this.dialogKey += 1;
+            }
+
+            this.dialogMode = mode;
         },
 
         closeCargoDialog() {
@@ -356,9 +403,15 @@ export default defineComponent({
                 );
                 const selected = this.cargos.find((cargo) => String(cargo.id) === selectedId);
 
+                const rows = excludeSuperadminCargos(response.data.data ?? []);
+                const selectedForList =
+                    selected && isUsuarioSuperadmin({ nivelAcesso: selected.nivelAcesso })
+                        ? undefined
+                        : selected;
+
                 this.cargos = withSelectedItem(
-                    response.data.data ?? [],
-                    selected,
+                    rows,
+                    selectedForList,
                     (cargo) => String(cargo.id)
                 );
             } catch (error) {
@@ -380,7 +433,7 @@ export default defineComponent({
                     response.data.limit,
                     this.pageLimit
                 );
-                this.funcionarios = response.data.data ?? [];
+                this.funcionarios = excludeCurrentUsuario(response.data.data ?? []);
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os funcionários.");
                 this.funcionarios = [];
@@ -390,10 +443,17 @@ export default defineComponent({
             }
         },
 
-        openDialog(mode: DialogMode, item: FuncionarioFormValues, cargo?: CargoApi) {
+        openDialog(
+            mode: DialogMode,
+            item: FuncionarioFormValues,
+            cargo?: CargoApi,
+            usuarioMeta?: Pick<UsuarioApi, "fundador" | "nivelAcesso">
+        ) {
             this.dialogKey += 1;
             this.dialogMode = mode;
             this.dialogItem = item;
+            this.dialogOriginalItem = JSON.parse(JSON.stringify(item));
+            this.dialogUsuarioSuperadmin = isUsuarioSuperadmin(usuarioMeta ?? {});
             this.dialogSaving = false;
             this.dialogOpen = true;
 
@@ -407,7 +467,7 @@ export default defineComponent({
         },
 
         onCreate() {
-            this.openDialog("create", emptyFormValues());
+            this.openDialog("create", emptyFormValues(), undefined, {});
         },
 
         async openUsuarioDialog(mode: "view" | "edit", row: Record<string, unknown>) {
@@ -430,7 +490,7 @@ export default defineComponent({
                     }
                     : undefined;
 
-                this.openDialog(mode, toFormValues(user), cargo);
+                this.openDialog(mode, toFormValues(user), cargo, user);
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar o funcionário.");
             }
@@ -440,12 +500,48 @@ export default defineComponent({
             if (value === "inspect") {
                 void this.openUsuarioDialog("view", item);
             } else if (value === "edit") {
+                if (
+                    isUsuarioSuperadmin({
+                        fundador: Boolean(item.fundador),
+                        nivelAcesso: String(item.nivelAcesso ?? "")
+                    })
+                ) {
+                    this.$toast.error("Não é permitido editar este usuário.");
+                    void this.openUsuarioDialog("view", item);
+                    return;
+                }
+
                 void this.openUsuarioDialog("edit", item);
             }
         },
 
-        onDelete() {
-            this.$toast.info("Exclusão de funcionário não está disponível.");
+        async onDelete(item: Record<string, unknown>) {
+            const cpf = documentDigits(item.cpf);
+
+            if (!cpf) {
+                this.$toast.error("CPF do funcionário é inválido.");
+                return;
+            }
+
+            if (
+                isUsuarioSuperadmin({
+                    fundador: Boolean(item.fundador),
+                    nivelAcesso: String(item.nivelAcesso ?? "")
+                })
+            ) {
+                this.$toast.error("Não é permitido excluir este usuário.");
+                return;
+            }
+
+            try {
+                await this.$http.put(`/api/usuario/${cpf}`, {
+                    ativo: false
+                });
+                this.$toast.success("Funcionário desativado.");
+                await this.getFuncionarios();
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível excluir o funcionário.");
+            }
         },
 
         onUsuarioSelectAction(payload: { id: string }) {
