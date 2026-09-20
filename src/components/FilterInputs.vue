@@ -1,21 +1,22 @@
 <template>
-    <div class="flex items-start gap-2 h-fit">
+    <div class="flex h-fit items-start gap-2">
         <Button
             class="p-2.5"
             aria-label="Recarregar"
-            :class="{
-                'animate-spin': loading
-            }"
-
             :disabled="loading"
 
             @click="$emit('reload')"
         >
-            <span class="fa-solid fa-rotate-right text-xs" />
+            <span
+                :class="{
+                    'animate-spin': loading
+                }"
+                class="fa-solid fa-rotate-right text-xs"
+            />
         </Button>
 
-        <div class="flex w-full justify-end gap-2 h-fit">
-            <div class="flex flex-wrap justify-end gap-2 h-fit">
+        <div class="flex h-fit w-full justify-end gap-2">
+            <div class="flex h-fit flex-wrap justify-end gap-2">
                 <div
                     v-for="filter in visibleInputFilters"
                     :key="'div-input-' + filter.value"
@@ -26,8 +27,7 @@
                         :id="`filter-${filter.value}`"
                         :key="filter.value"
 
-                        class="min-w-48 max-w-xs"
-
+                        class="max-w-xs min-w-48"
                         :type="inputTypeFor(filter)"
                         :placeholder="filter.label"
                         :model-value="inputValues[filter.value] ?? ''"
@@ -40,7 +40,7 @@
                     v-for="filter in visibleSelectFilters"
                     :key="'div-select-' + filter.value"
 
-                    class="h-fit min-w-56 max-w-sm"
+                    class="h-fit max-w-sm min-w-56"
                 >
                     <Select
                         :id="`filter-${filter.value}`"
@@ -69,7 +69,6 @@
 
                 <Dropdown
                     v-model:open="filtersOpen"
-
                     hide-dropdown-arrow
                     show-checkmark
                     :close-on-select="false"
@@ -206,12 +205,14 @@ export default defineComponent({
 
     computed: {
         visibleInputFilters(): FilterInputDef[] {
-            return this.filters.filter(isInputFilter)
+            return this.filters
+                .filter(isInputFilter)
                 .filter((filter) => this.visibleInputKeys.includes(filter.value));
         },
 
         visibleSelectFilters(): FilterSelectDef[] {
-            return this.filters.filter(isSelectFilter)
+            return this.filters
+                .filter(isSelectFilter)
                 .filter((filter) => this.visibleSelectKeys.includes(filter.value));
         },
 
@@ -292,8 +293,8 @@ export default defineComponent({
                 optionSelections[filter.value] = previousChoice
                     ? [previousChoice]
                     : defaultChoice
-                        ? [defaultChoice]
-                        : [];
+                      ? [defaultChoice]
+                      : [];
             }
 
             this.inputValues = inputValues;
@@ -332,11 +333,11 @@ export default defineComponent({
             }
 
             if (
-                filter.value === "cpf"
-                || filter.value === "cnpj"
-                || filter.value === "email"
-                || filter.value === "phone"
-                || filter.value === "cep"
+                filter.value === "cpf" ||
+                filter.value === "cnpj" ||
+                filter.value === "email" ||
+                filter.value === "phone" ||
+                filter.value === "cep"
             ) {
                 return filter.value;
             }
@@ -354,10 +355,10 @@ export default defineComponent({
             const inputType = this.inputTypeFor(filter);
 
             if (
-                inputType === "cpf"
-                || inputType === "cnpj"
-                || inputType === "phone"
-                || inputType === "cep"
+                inputType === "cpf" ||
+                inputType === "cnpj" ||
+                inputType === "phone" ||
+                inputType === "cep"
             ) {
                 return raw.replace(/\D/g, "");
             }
@@ -446,10 +447,7 @@ export default defineComponent({
             this.emitFilters();
         },
 
-        onSelectSearch(
-            filter: FilterSelectDef,
-            payload: { field: string; value: string }
-        ) {
+        onSelectSearch(filter: FilterSelectDef, payload: { field: string; value: string }) {
             this.$emit("search:external", {
                 filterKey: filter.value,
                 field: payload.field || filter.search?.field || "id",
@@ -503,7 +501,9 @@ export default defineComponent({
 
             if (isInputFilter(filter)) {
                 if (this.visibleInputKeys.includes(filter.value)) {
-                    this.visibleInputKeys = this.visibleInputKeys.filter((key) => key !== filter.value);
+                    this.visibleInputKeys = this.visibleInputKeys.filter(
+                        (key) => key !== filter.value
+                    );
                     this.inputValues = {
                         ...this.inputValues,
                         [filter.value]: ""
@@ -519,7 +519,9 @@ export default defineComponent({
 
             if (isSelectFilter(filter)) {
                 if (this.visibleSelectKeys.includes(filter.value)) {
-                    this.visibleSelectKeys = this.visibleSelectKeys.filter((key) => key !== filter.value);
+                    this.visibleSelectKeys = this.visibleSelectKeys.filter(
+                        (key) => key !== filter.value
+                    );
                     this.selectSelections = {
                         ...this.selectSelections,
                         [filter.value]: []

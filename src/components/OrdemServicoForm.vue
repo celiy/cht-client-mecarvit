@@ -313,58 +313,57 @@
             @search:servico="$emit('search:servico', $event)"
         />
 
-        <div class="grid gap-4 rounded border border-dashed p-3 sm:grid-cols-3">
-            <Input
-                id="totalPecas"
-                type="money"
-                label="Total peças"
-                variant="display"
-                readonly
-                :value="totalsDisplay.pecas"
-            />
-
-            <Input
-                id="totalObra"
-                type="money"
-                label="Total mão de obra"
-                variant="display"
-                readonly
-                :value="totalsDisplay.obra"
-            />
-
-            <div class="flex flex-col gap-4">
+        <div class="rounded border border-dashed p-3">
+            <div class="grid gap-4 sm:grid-cols-3">
                 <Input
-                    id="totalGeral"
+                    id="totalPecas"
                     type="money"
-                    label="Total geral"
+                    label="Total peças"
                     variant="display"
                     readonly
-                    :value="totalsDisplay.total"
+                    :value="totalsDisplay.pecas"
                 />
 
                 <Input
-                    id="totalPago"
+                    id="totalObra"
                     type="money"
-                    label="Total pago até agora"
+                    label="Total mão de obra"
                     variant="display"
                     readonly
-                    :value="totalPagoDisplay"
+                    :value="totalsDisplay.obra"
                 />
-            </div>
 
-            <div
-                v-if="!isView"
+                <div class="flex flex-col gap-4">
+                    <Input
+                        id="totalGeral"
+                        type="money"
+                        label="Total geral"
+                        variant="display"
+                        readonly
+                        :value="totalsDisplay.total"
+                    />
 
-                class="flex w-full justify-end"
-            >
-                <Button
-                    type="button"
-                    variant="outline"
-                    left-icon="fa-money-bill"
-                    :label="pagamentosButtonLabel"
+                    <Input
+                        id="totalPago"
+                        type="money"
+                        label="Total pago até agora"
+                        variant="display"
+                        readonly
+                        :value="totalPagoDisplay"
+                    />
 
-                    @click="$emit('click:pagamentos')"
-                />
+                    <Button
+                        v-if="!isView"
+
+                        type="button"
+                        variant="outline"
+                        class="w-full"
+                        left-icon="fa-money-bill"
+                        :label="pagamentosButtonLabel"
+
+                        @click="$emit('click:pagamentos')"
+                    />
+                </div>
             </div>
         </div>
 
