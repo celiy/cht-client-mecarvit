@@ -246,9 +246,9 @@ import OrdemServicoForm, {
     type VeiculoSelectOption
 } from "../../components/OrdemServicoForm.vue";
 import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
-import { formatDateInputValue } from "@shared/format/dateTime";
+import { formatDateBr, formatDateInputValue } from "@shared/format/dateTime";
 import { formatTableLabel } from "../../js/formatTableLabel";
-import { registroFormFields } from "../../js/entityFields";
+import { dateToInputValue, registroFormFields } from "../../js/entityFields";
 import PagamentosModal from "../../components/PagamentosModal.vue";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
 import { sumPagamentosValor, type PagamentoFormRow } from "../../js/pagamentoOptions";
@@ -288,6 +288,7 @@ interface RegistroApi {
     nome: string;
     valor: number;
     descricao?: string | null;
+    dataLimitePagamento?: string | null;
     ordemServico?: OrdemServicoLinkApi | null;
     pagamentos?: PagamentoApi[];
 }
@@ -324,12 +325,14 @@ interface OrdemServicoApi {
     statusOsId?: number;
     dataInicio?: string | null;
     dataConclusao?: string | null;
+    dataLimitePagamento?: string | null;
     diagnosticoCliente?: string | null;
     diagnosticoMecanico?: string | null;
     obs?: string | null;
     itens?: OrdemServicoItemApi[];
     pagamentos?: PagamentoApi[];
     responsaveis?: string[];
+    registroEntradaSaida?: { dataLimitePagamento?: string | null } | null;
 }
 
 interface UsuarioApi {
@@ -359,6 +362,7 @@ interface RegistroFormValues {
     valor: string;
     valorPago?: string;
     descricao: string;
+    dataLimitePagamento: string;
 }
 
 type CrudListPageExpose = {
@@ -370,7 +374,8 @@ function emptyRegistroForm(tipo = ""): RegistroFormValues {
         tipo,
         nome: "",
         valor: "",
-        descricao: ""
+        descricao: "",
+        dataLimitePagamento: ""
     };
 }
 
@@ -383,7 +388,8 @@ function toRegistroForm(registro: RegistroApi): RegistroFormValues {
         nome: registro.nome ?? "",
         valor: registro.valor == null ? "" : moneyAmountToInputDigits(Number(registro.valor)),
         valorPago: formatMoneyBrl(sumPagamentosValor(registro.pagamentos)),
-        descricao: registro.descricao ?? ""
+        descricao: registro.descricao ?? "",
+        dataLimitePagamento: dateToInputValue(registro.dataLimitePagamento)
     };
 }
 
@@ -412,6 +418,9 @@ function toOsForm(
         veiculoTipo: veiculo?.tipo ?? "",
         dataInicio: formatDateInputValue(os.dataInicio),
         dataConclusao: formatDateInputValue(os.dataConclusao),
+        dataLimitePagamento: dateToInputValue(
+            os.registroEntradaSaida ? os.registroEntradaSaida.dataLimitePagamento : os.dataLimitePagamento
+        ),
         diagnosticoCliente: os.diagnosticoCliente ?? "",
         diagnosticoMecanico: os.diagnosticoMecanico ?? "",
         obs: os.obs ?? "",
@@ -456,7 +465,8 @@ export default defineComponent({
             tableHeaders: [
                 { label: "Nome", field: "nome", position: "start" },
                 { label: "Valor", field: "valorLabel", position: "end" },
-                { label: "Pago", field: "pagoLabel", position: "end" }
+                { label: "Pago", field: "pagoLabel", position: "end" },
+                { label: "Data limite", field: "dataLimiteLabel", position: "end" }
             ] as TableHeader[],
             entradas: [] as RegistroApi[],
             saidas: [] as RegistroApi[],
@@ -514,9 +524,19 @@ export default defineComponent({
             };
         },
 
+        dataLimiteFilterDef(): FilterDef {
+            return {
+                type: "input",
+                value: "dataLimitePagamento",
+                label: "Data limite",
+                inputType: "date"
+            };
+        },
+
         entradaFilterDefs(): FilterDef[] {
             return [
                 { type: "input", value: "nome", label: "Nome", default: true },
+                this.dataLimiteFilterDef,
                 {
                     type: "select",
                     value: "ordemServicoId",
@@ -534,6 +554,7 @@ export default defineComponent({
         saidaFilterDefs(): FilterDef[] {
             return [
                 { type: "input", value: "nome", label: "Nome", default: true },
+                this.dataLimiteFilterDef,
                 this.pagoFilterDef
             ];
         },
@@ -652,7 +673,7 @@ export default defineComponent({
         currentDialogItemValues(): RegistroFormValues {
             const next = { ...this.dialogItem };
 
-            for (const fieldId of ["id", "criadoEm", "modificadoEm", "tipo", "nome", "valor", "valorPago", "descricao"]) {
+            for (const fieldId of ["id", "criadoEm", "modificadoEm", "tipo", "nome", "valor", "valorPago", "descricao", "dataLimitePagamento"]) {
                 const value = this.itemDialog()?.getFieldValue(fieldId);
 
                 if (value !== undefined) {
@@ -691,7 +712,8 @@ export default defineComponent({
                 ...row,
                 tipoLabel: tipoLabel(row.tipo),
                 valorLabel: formatMoneyBrl(row.valor),
-                pagoLabel: formatMoneyBrl(this.pagamentosValorFromApi(row.pagamentos))
+                pagoLabel: formatMoneyBrl(this.pagamentosValorFromApi(row.pagamentos)),
+                dataLimiteLabel: formatDateBr(row.dataLimitePagamento)
             };
         },
 
@@ -1214,7 +1236,8 @@ export default defineComponent({
                 const body: Record<string, unknown> = {
                     tipo: payload.tipo,
                     nome: payload.nome,
-                    descricao: payload.descricao || undefined
+                    descricao: payload.descricao || undefined,
+                    dataLimitePagamento: payload.dataLimitePagamento || null
                 };
 
                 if (this.dialogMode === "create" || !this.lockValorFromOs) {

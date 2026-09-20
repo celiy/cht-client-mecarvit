@@ -1,17 +1,17 @@
 <template>
-    <AppUpdateButton class="fixed top-4 right-2 z-50" />
+    <AppUpdateButton class="fixed top-4 right-4 z-50" />
 
-    <div class="container-center mt-8">
-        <img
-            class="mx-auto mb-3 h-24 w-24"
-            :src="logo"
-            alt="Mecarvit"
-        />
+    <main class="flex min-h-screen flex-col items-center p-6">
+        <div class="container-center mt-12 mb-4">
+            <img
+                class="mx-auto mb-3 h-24 w-24"
+                :src="logo"
+                alt="Mecarvit"
+            />
 
-        <h1>Mecarvit</h1>
-    </div>
+            <h1>Mecarvit</h1>
+        </div>
 
-    <main class="flex min-h-dvh items-center justify-center p-6">
         <Card class="w-full max-w-md">
             <template #header>
                 <h4 class="text-xl font-semibold">Entrar</h4>

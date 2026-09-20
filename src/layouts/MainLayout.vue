@@ -3,123 +3,7 @@
         <Sidebar
             :title="$mecarvit.company?.nome"
             description="Sistema Mecarvit"
-            :nav-items="[
-                {
-                    type: 'section',
-                    label: 'Início'
-                },
-                {
-                    type: 'link',
-                    label: 'Dashboard',
-                    link: '/home',
-                    leftIcon: 'fa-house'
-                },
-
-                {
-                    type: 'section',
-                    label: 'Cadastros'
-                },
-                {
-                    type: 'group',
-                    label: 'Funcionários',
-                    leftIcon: 'fa-users',
-                    links: [
-                        {
-                            label: 'Gerenciar',
-                            link: '/funcionarios'
-                        },
-                        {
-                            label: 'Cadastrar',
-                            link: '/funcionarios?cadastrar=true',
-                            leftIcon: 'fa-plus'
-                        }
-                    ]
-                },
-                {
-                    type: 'group',
-                    label: 'Clientes',
-                    leftIcon: 'fa-user',
-                    links: [
-                        {
-                            label: 'Gerenciar',
-                            link: '/clientes'
-                        },
-                        {
-                            label: 'Cadastrar',
-                            link: '/clientes?cadastrar=true',
-                            leftIcon: 'fa-plus'
-                        }
-                    ]
-                },
-                {
-                    type: 'group',
-                    label: 'Veículos',
-                    leftIcon: 'fa-car',
-                    links: [
-                        {
-                            label: 'Gerenciar',
-                            link: '/veiculos'
-                        },
-                        {
-                            label: 'Cadastrar',
-                            link: '/veiculos?cadastrar=true',
-                            leftIcon: 'fa-plus'
-                        }
-                    ]
-                },
-
-                {
-                    type: 'section',
-                    label: 'Ordens de serviço'
-                },
-                {
-                    type: 'group',
-                    label: 'Ordens de serviço',
-                    leftIcon: 'fa-wrench',
-                    openByDefault: true,
-                    links: [
-                        {
-                            label: 'Gerenciar',
-                            link: '/ordem-servico'
-                        },
-                        {
-                            label: 'Cadastrar',
-                            link: '/ordem-servico?cadastrar=true',
-                            leftIcon: 'fa-plus'
-                        }
-                    ]
-                },
-
-                {
-                    type: 'section',
-                    label: 'Financeiro'
-                },
-                {
-                    type: 'group',
-                    label: 'Entradas e saídas',
-                    leftIcon: 'fa-money-bill',
-                    openByDefault: true,
-                    links: [
-                        {
-                            label: 'Gerenciar',
-                            link: '/registro-entrada-saida'
-                        },
-                        {
-                            label: 'Entradas',
-                            link: '/registro-entrada-saida#entradas'
-                        },
-                        {
-                            label: 'Saídas',
-                            link: '/registro-entrada-saida#saidas'
-                        },
-                        {
-                            label: 'Cadastrar',
-                            link: '/registro-entrada-saida?cadastrar=true',
-                            leftIcon: 'fa-plus'
-                        }
-                    ]
-                }
-            ]"
+            :nav-items="navItems"
         >
             <template #top-bar>
                 <div class="ml-auto flex items-center pr-2">
@@ -210,11 +94,14 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { clearAuthToken } from "@base/http";
 import { project } from "@base/project";
-import { clearMecarvitSession } from "../js/mecarvit";
+import { clearMecarvitSession, mecarvit } from "../js/mecarvit";
+import { sidebarNavItems } from "../js/sidebarNav";
 import Button from "@design/components/Button.vue";
 import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 
 const router = useRouter();
+
+const navItems = computed(() => sidebarNavItems(mecarvit.user?.nivelAcesso));
 
 const themeIcon = computed(() => {
     return project.style.activeTheme === "dark" ? "fa-sun" : "fa-moon";

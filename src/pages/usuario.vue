@@ -1,54 +1,72 @@
 <template>
     <main class="p-8">
-        <Card v-if="$mecarvit.user">
-            <template #header>
-                <h2 class="text-lg font-semibold">
-                    Meu perfil
-                </h2>
-            </template>
+        <template v-if="$mecarvit.user">
+            <Card v-if="!changePassword">
+                <template #header>
+                    <h4 class="text-lg font-semibold">Meu perfil</h4>
+                </template>
 
-            <template #body>
-                <FormRenderer
-                    ref="profileForm"
-                    form-id="usuario-profile-form"
-                    :fields="profileFields"
-                    :values="profileValues"
-                    :section-columns="1"
+                <template #body>
+                    <FormRenderer
+                        ref="profileForm"
 
-                    @submit="onSaveProfile"
-                />
+                        form-id="usuario-profile-form"
+                        :fields="profileFields"
+                        :values="profileValues"
+                        :section-columns="1"
 
-                <div class="mt-4 flex flex-wrap gap-2">
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        label="Alterar senha"
-
-                        @click="goChangePassword"
+                        @submit="onSaveProfile"
                     />
-                </div>
-            </template>
+                </template>
 
-            <template #footer>
-                <div class="flex flex-wrap justify-end gap-2">
-                    <Button
-                        type="submit"
-                        form="usuario-profile-form"
-                        variant="primary"
-                        label="Salvar"
-                        :disabled="profileSaving"
+                <template #footer>
+                    <div class="flex justify-between gap-2">
+                        <div>
+                            <Button
+                                label="Trocar senha"
+
+                                @click="changePassword = !changePassword"
+                            />
+                        </div>
+
+                        <div class="flex gap-2">
+                            <Button
+                                type="submit"
+                                form="usuario-profile-form"
+                                variant="primary"
+                                label="Salvar"
+                                :disabled="profileSaving"
+                            />
+
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                label="Sair"
+
+                                @click="logout"
+                            />
+                        </div>
+                    </div>
+                </template>
+            </Card>
+
+            <Card v-else>
+                <template #header>
+                    <h4 class="text-lg font-semibold">Alterar senha</h4>
+                </template>
+
+                <template #body>
+                    <ChangePasswordForm
+                        :key="passwordFormKey"
+
+                        show-cancel-button
+
+                        @success="onPasswordChanged"
+                        @cancel="changePassword = false"
                     />
-
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        label="Sair"
-
-                        @click="logout"
-                    />
-                </div>
-            </template>
-        </Card>
+                </template>
+            </Card>
+        </template>
 
         <Card v-else>
             <template #body>
@@ -64,6 +82,7 @@ import type { FormField } from "@shared/interfaces/FormField";
 import Card from "@design/components/Card.vue";
 import Button from "@design/components/Button.vue";
 import FormRenderer from "@design/components/form/FormRenderer.vue";
+import ChangePasswordForm from "../components/ChangePasswordForm.vue";
 import { clearAuthToken } from "@base/http";
 import { clearMecarvitSession, loadCurrentUser, mecarvit } from "../js/mecarvit";
 import { documentDigits, notifyHttpError } from "../js/crudHttp";
@@ -79,12 +98,15 @@ export default defineComponent({
     components: {
         Button,
         Card,
+        ChangePasswordForm,
         FormRenderer
     },
 
     data() {
         return {
             profileSaving: false,
+            passwordFormKey: 0,
+            changePassword: false,
             profileValues: {
                 nome: "",
                 email: "",
@@ -157,8 +179,10 @@ export default defineComponent({
             };
         },
 
-        goChangePassword() {
-            void this.$router.push("/trocar-senha");
+        onPasswordChanged() {
+            this.passwordFormKey += 1;
+            this.changePassword = false;
+            this.$toast.success("Senha alterada.");
         },
 
         async onSaveProfile(payload: Record<string, unknown>) {

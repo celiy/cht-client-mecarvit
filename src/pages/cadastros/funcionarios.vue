@@ -37,6 +37,34 @@
             @update:mode="onDialogModeChange"
             @click:select-action="onUsuarioSelectAction"
             @search:external="onSearchExternal"
+        >
+            <template #formActions>
+                <Button
+                    v-if="dialogMode !== 'view' && !dialogUsuarioSuperadmin"
+
+                    type="button"
+                    variant="secondary"
+                    label="Resetar senha"
+                    left-icon="fa-rotate-right"
+                    class="mr-auto"
+
+                    @click="openResetConfirm"
+                />
+            </template>
+        </ItemViewEdit>
+
+        <ConfirmationModal
+            :is-open="resetConfirmOpen"
+            variant="warning"
+            title="Resetar senha"
+            description="O funcionário precisará trocar a senha no próximo acesso."
+            body="Defina uma nova senha para o funcionário. Esta ação não pode ser desfeita."
+            confirm-text="Resetar"
+            cancel-text="Cancelar"
+
+            @confirm="onConfirmReset"
+            @cancel="closeResetConfirm"
+            @update:is-open="onResetOpenChange"
         />
 
         <ItemViewEdit
@@ -64,6 +92,7 @@ import { PASSWORD_MIN_LENGTH } from "@shared/validators/password";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
+import ConfirmationModal from "@design/components/custom/ConfirmationModal.vue";
 import {
     ATIVO_FILTER_OPTIONS,
     documentDigits,
@@ -154,6 +183,7 @@ export default defineComponent({
     name: "MecarvitFuncionariosPage",
 
     components: {
+        ConfirmationModal,
         CrudListPage,
         ItemViewEdit
     },
@@ -193,7 +223,9 @@ export default defineComponent({
             page: 1,
             pageLimit: 10,
             pageCount: 0,
-            dialogUsuarioSuperadmin: false
+            dialogUsuarioSuperadmin: false,
+            senhaResetTriggered: false,
+            resetConfirmOpen: false
         };
     },
 
@@ -245,6 +277,15 @@ export default defineComponent({
                 fields.push({
                     id: "senha",
                     label: "Senha",
+                    type: "password",
+                    required: true,
+                    minSize: PASSWORD_MIN_LENGTH,
+                    helperText: `Mínimo de ${PASSWORD_MIN_LENGTH} caracteres`
+                });
+            } else if (this.senhaResetTriggered) {
+                fields.push({
+                    id: "senha",
+                    label: "Nova senha",
                     type: "password",
                     required: true,
                     minSize: PASSWORD_MIN_LENGTH,
@@ -339,6 +380,8 @@ export default defineComponent({
             this.dialogOpen = false;
             this.dialogSaving = false;
             this.dialogUsuarioSuperadmin = false;
+            this.senhaResetTriggered = false;
+            this.resetConfirmOpen = false;
             this.closeCargoDialog();
             void this.$refs.listPage?.clearCadastrarQuery?.();
         },
@@ -354,6 +397,7 @@ export default defineComponent({
 
             if (this.dialogMode === "edit" && mode === "view") {
                 this.dialogItem = JSON.parse(JSON.stringify(this.dialogOriginalItem));
+                this.senhaResetTriggered = false;
                 this.dialogKey += 1;
             }
 
@@ -363,6 +407,25 @@ export default defineComponent({
         closeCargoDialog() {
             this.cargoDialogOpen = false;
             this.cargoSaving = false;
+        },
+
+        openResetConfirm() {
+            this.resetConfirmOpen = true;
+        },
+
+        closeResetConfirm() {
+            this.resetConfirmOpen = false;
+        },
+
+        onResetOpenChange(open: boolean) {
+            if (!open) {
+                this.resetConfirmOpen = false;
+            }
+        },
+
+        onConfirmReset() {
+            this.senhaResetTriggered = true;
+            this.resetConfirmOpen = false;
         },
 
         onFilters(values: FilterValues) {
@@ -629,15 +692,25 @@ export default defineComponent({
                     this.$toast.success("Funcionário criado.");
                 } else {
                     const cpf = documentDigits(this.dialogItem.cpf);
-
-                    await this.$http.put(`/api/usuario/${cpf}`, {
+                    const patch: Record<string, unknown> = {
                         nome: payload.nome,
                         email: payload.email,
                         cargoId: Number(payload.cargoId),
                         ativo: Boolean(payload.ativo)
-                    });
+                    };
 
-                    this.$toast.success("Funcionário atualizado.");
+                    if (this.senhaResetTriggered && payload.senha) {
+                        patch.senha = String(payload.senha);
+                        patch.senhaInicial = true;
+                    }
+
+                    await this.$http.put(`/api/usuario/${cpf}`, patch);
+
+                    this.$toast.success(
+                        this.senhaResetTriggered
+                            ? "Senha do funcionário resetada."
+                            : "Funcionário atualizado."
+                    );
                 }
 
                 this.closeDialog();

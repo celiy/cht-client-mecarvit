@@ -113,6 +113,7 @@
 import { defineComponent } from "vue";
 import { HttpError } from "@base/http";
 import { toQueryString } from "@shared/frontend/queryString";
+import { formatDateBr } from "@shared/format/dateTime";
 import Button from "@design/components/Button.vue";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import PagamentosModal from "../../components/PagamentosModal.vue";
@@ -127,7 +128,7 @@ import { clienteNomeSocialForSave, optionalTextForSave } from "../../js/entityFi
 import { digitsOnly } from "@shared/validators/mecarvit";
 import { parseMoneyInput } from "@shared/format/moneyInput";
 import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
-import { toOsForm, type OrdemServicoApi } from "../../js/ordemServicoFormMap";
+import { toOsForm, osDataLimitePagamento, type OrdemServicoApi } from "../../js/ordemServicoFormMap";
 import {
     documentDigits,
     fieldErrorsFromHttp,
@@ -259,7 +260,8 @@ export default defineComponent({
                     label: "Status",
                     field: "statusBadge",
                     position: "center"
-                }
+                },
+                { label: "Data limite", field: "dataLimiteLabel", position: "end" }
             ] as TableHeader[],
             ordens: [] as OrdemServicoApi[],
             clientes: [] as ClienteApi[],
@@ -332,6 +334,12 @@ export default defineComponent({
                         { label: "Sim", value: "sim" },
                         { label: "Não", value: "nao" }
                     ]
+                },
+                {
+                    type: "input",
+                    value: "dataLimitePagamento",
+                    label: "Data limite",
+                    inputType: "date"
                 }
             ];
         },
@@ -381,7 +389,8 @@ export default defineComponent({
                     statusBadge: osStatusBadge(
                         os.statusOsId,
                         os.status?.nome || this.statusNameById[os.statusOsId] || "—"
-                    )
+                    ),
+                    dataLimiteLabel: formatDateBr(osDataLimitePagamento(os))
                 };
             });
         },
@@ -1386,6 +1395,7 @@ export default defineComponent({
                     obs: optionalTextForSave(payload.obs, isCreate),
                     dataInicio: optionalTextForSave(payload.dataInicio, isCreate),
                     dataConclusao: optionalTextForSave(payload.dataConclusao, isCreate),
+                    dataLimitePagamento: optionalTextForSave(payload.dataLimitePagamento, isCreate),
                     itens: this.itensPayload(payload.itens),
                     responsaveis: payload.responsaveisCpfs
                         .map((cpf) => documentDigits(cpf))

@@ -3,6 +3,7 @@ import { moneyAmountToInputDigits } from "@shared/format/moneyInput";
 import type { OrdemServicoFormValues } from "../components/OrdemServicoForm.vue";
 import type { OrdemServicoItemFormRow } from "../components/OrdemServicoItensSection.vue";
 import { documentDigits } from "./crudHttp";
+import { dateToInputValue } from "./entityFields";
 
 export interface OrdemServicoItemApi {
     servicoId: number;
@@ -22,6 +23,7 @@ export interface OrdemServicoApi {
     diagnosticoMecanico?: string | null;
     dataInicio?: string | null;
     dataConclusao?: string | null;
+    dataLimitePagamento?: string | null;
     obs?: string | null;
     statusOsId: number;
     status?: { id: number; nome: string } | null;
@@ -35,7 +37,10 @@ export interface OrdemServicoApi {
     }>;
     responsaveis?: string[];
     total?: number;
-    registroEntradaSaida?: { valor: number } | null;
+    registroEntradaSaida?: {
+        valor: number;
+        dataLimitePagamento?: string | null;
+    } | null;
 }
 
 export interface ClienteOsFormLookup {
@@ -48,6 +53,22 @@ export interface VeiculoOsFormLookup {
     placa?: string;
     kilometragem?: number | null;
     tipo?: string | null;
+}
+
+/**
+ * Deadline visible for an OS.
+ *
+ * The OS column only holds the value while the record it generates does not
+ * exist yet. Once it exists, that record owns the deadline — including when it
+ * is explicitly null — so an edit in the financeiro is never shadowed by a
+ * stale copy on the OS.
+ */
+export function osDataLimitePagamento(os: OrdemServicoApi): unknown {
+    if (os.registroEntradaSaida) {
+        return os.registroEntradaSaida.dataLimitePagamento ?? null;
+    }
+
+    return os.dataLimitePagamento ?? null;
 }
 
 function mapItensFromApi(itens: OrdemServicoItemApi[] | undefined): OrdemServicoItemFormRow[] {
@@ -85,6 +106,7 @@ export function toOsForm(
         statusOsId: os.statusOsId != null ? String(os.statusOsId) : "1",
         dataInicio: formatDateInputValue(os.dataInicio),
         dataConclusao: formatDateInputValue(os.dataConclusao),
+        dataLimitePagamento: dateToInputValue(osDataLimitePagamento(os)),
         diagnosticoCliente: os.diagnosticoCliente ?? "",
         diagnosticoMecanico: os.diagnosticoMecanico ?? "",
         obs: os.obs ?? "",

@@ -205,32 +205,6 @@
             />
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2">
-            <Input
-                id="dataInicio"
-                type="date"
-                label="Data de início"
-                :variant="isView ? 'display' : 'secondary'"
-                :readonly="isView"
-                :value="formValues.dataInicio"
-                :error="fieldError('dataInicio')"
-
-                @update:value="updateValue('dataInicio', $event)"
-            />
-
-            <Input
-                id="dataConclusao"
-                type="date"
-                label="Data de conclusão"
-                :variant="isView ? 'display' : 'secondary'"
-                :readonly="isView"
-                :value="formValues.dataConclusao"
-                :error="fieldError('dataConclusao')"
-
-                @update:value="updateValue('dataConclusao', $event)"
-            />
-        </div>
-
         <Marker separator />
 
         <div
@@ -261,6 +235,45 @@
                 readonly
                 :value="statusLabel"
             />
+
+            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                <Input
+                    id="dataInicio"
+                    type="date"
+                    label="Data de início"
+                    :variant="isView ? 'display' : 'secondary'"
+                    :readonly="isView"
+                    :value="formValues.dataInicio"
+                    :error="fieldError('dataInicio')"
+
+                    @update:value="updateValue('dataInicio', $event)"
+                />
+
+                <Input
+                    id="dataConclusao"
+                    type="date"
+                    label="Data de conclusão"
+                    :variant="isView ? 'display' : 'secondary'"
+                    :readonly="isView"
+                    :value="formValues.dataConclusao"
+                    :error="fieldError('dataConclusao')"
+
+                    @update:value="updateValue('dataConclusao', $event)"
+                />
+
+                <Input
+                    id="dataLimitePagamento"
+                    type="date"
+                    label="Data limite de pagamento"
+                    helper-text="Opcional. Prazo combinado com o cliente para o pagamento."
+                    :variant="isView ? 'display' : 'secondary'"
+                    :readonly="isView"
+                    :value="formValues.dataLimitePagamento"
+                    :error="fieldError('dataLimitePagamento')"
+
+                    @update:value="updateValue('dataLimitePagamento', $event)"
+                />
+            </div>
         </div>
 
         <Marker separator />
@@ -342,8 +355,7 @@
             <div
                 v-if="!isView"
 
-                class="flex w-full"
-                :class="pagamentosButtonRowClass"
+                class="flex w-full justify-end"
             >
                 <Button
                     type="button"
@@ -426,6 +438,7 @@ export type OrdemServicoFormValues = {
     statusOsId: string;
     dataInicio: string;
     dataConclusao: string;
+    dataLimitePagamento: string;
     diagnosticoCliente: string;
     diagnosticoMecanico: string;
     obs: string;
@@ -459,6 +472,7 @@ export function emptyOrdemServicoFormValues(options?: {
         statusOsId: defaultStatusId,
         dataInicio: options?.dataInicioToday ? formatDateInputValue(new Date()) : "",
         dataConclusao: "",
+        dataLimitePagamento: "",
         diagnosticoCliente: "",
         diagnosticoMecanico: "",
         obs: "",
@@ -493,6 +507,7 @@ export function mergeOrdemServicoFormValues(
         statusOsId: String(partial.statusOsId ?? base.statusOsId),
         dataInicio: String(partial.dataInicio ?? base.dataInicio),
         dataConclusao: String(partial.dataConclusao ?? base.dataConclusao),
+        dataLimitePagamento: String(partial.dataLimitePagamento ?? base.dataLimitePagamento),
         diagnosticoCliente: String(partial.diagnosticoCliente ?? base.diagnosticoCliente),
         diagnosticoMecanico: String(partial.diagnosticoMecanico ?? base.diagnosticoMecanico),
         obs: String(partial.obs ?? base.obs),
@@ -705,12 +720,6 @@ export default defineComponent({
                 this.hasClienteSelecionado ||
                 Boolean(ordemServicoFieldText(this.formValues, "clienteNome"))
             );
-        },
-
-        pagamentosButtonRowClass(): string {
-            const isMobile = this.$project?.device?.isMobile ?? false;
-
-            return isMobile ? "justify-end" : "justify-start";
         },
 
         filteredVeiculoOptions(): VeiculoSelectOption[] {

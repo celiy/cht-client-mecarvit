@@ -59,7 +59,6 @@
             <CriadoModificadoFields
                 v-if="isView"
 
-                class="mt-4"
                 :id-prefix="formId"
                 :criado-em="item.criadoEm"
                 :modificado-em="item.modificadoEm"

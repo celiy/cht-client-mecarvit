@@ -412,6 +412,12 @@ export function registroFormFields(options?: {
             required: !lockValor,
             readonly: lockValor,
             disabled: lockValor
+        },
+        {
+            id: "dataLimitePagamento",
+            label: "Data limite de pagamento",
+            type: "date",
+            helperText: "Opcional. Deixe vazio quando não houver prazo definido."
         }
     ];
 
