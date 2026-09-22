@@ -1,5 +1,5 @@
 <template>
-    <main class="container p-8 container-center">
+    <main class="container-center container p-8">
         <div class="flex items-center justify-between">
             <h2 class="text-2xl font-semibold">
                 {{ title }}
@@ -58,7 +58,6 @@
                     :key="paginationKey"
 
                     class="mt-4"
-
                     :amount="pageCount"
                     :show-max="5"
                     :use-memo="true"
@@ -74,13 +73,13 @@
             :is-open="deleteOpen"
             variant="destructive"
             title="Excluir"
-            :body="deleteBody"
+            :description="deleteBody"
             confirm-text="Excluir"
             cancel-text="Cancelar"
 
             @confirm="onConfirmDelete"
             @cancel="closeDelete"
-            @update:isOpen="onDeleteOpenChange"
+            @update:is-open="onDeleteOpenChange"
         />
     </main>
 </template>
