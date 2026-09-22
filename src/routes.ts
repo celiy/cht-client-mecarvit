@@ -1,7 +1,6 @@
 import type { RouteRecordRaw } from "vue-router";
 
 import MainLayout from "./layouts/MainLayout.vue";
-import IndexPage from "./pages/index.vue";
 import HomePage from "./pages/home.vue";
 import LoginPage from "./pages/login.vue";
 import RegisterPage from "./pages/register.vue";
@@ -50,7 +49,7 @@ const routes: RouteRecordRaw[] = [
             requiresAuth: true
         },
         children: [
-            { path: "", name: "index", component: IndexPage },
+            { path: "", name: "index", redirect: "/home" },
             { path: "home", name: "home", component: HomePage },
             { path: "usuario", name: "usuario", component: UsuarioPage },
             { path: "funcionarios", name: "funcionarios", component: FuncionariosPage },

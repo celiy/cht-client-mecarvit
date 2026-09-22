@@ -7,20 +7,22 @@ import {
     mecarvitPlugin
 } from "./js/mecarvit";
 
+export function isAuthenticated(): boolean {
+    return Boolean(http.getAuthToken());
+}
+
 export function setupAuthGuard(router: Router): void {
     router.beforeEach((to) => {
-        const isAuthenticated = Boolean(http.getAuthToken());
+        const authenticated = isAuthenticated();
 
-        if (to.meta.requiresAuth && !isAuthenticated) {
+        if (to.meta.requiresAuth && !authenticated) {
             return {
                 name: "login",
-                query: {
-                    redirect: to.fullPath
-                }
+                query: to.name === "index" ? undefined : { redirect: to.fullPath }
             };
         }
 
-        if (to.meta.guestOnly && isAuthenticated) {
+        if (to.meta.guestOnly && authenticated) {
             return { name: "home" };
         }
 
@@ -29,7 +31,6 @@ export function setupAuthGuard(router: Router): void {
 }
 
 export async function installClientPlugins(app: App, router: Router): Promise<void> {
-    setupAuthGuard(router);
     app.use(mecarvitPlugin);
 
     await loadCurrentUser();

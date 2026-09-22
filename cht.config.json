@@ -2,6 +2,13 @@
     "name": "mecarvit",
     "siteTitle": "Mecarvit",
     "apiBaseUrl": "http://127.0.0.1:3001",
+    "api": {
+        "dev": "http://127.0.0.1:3001",
+        "web": "http://127.0.0.1:3001",
+        "electron": "http://127.0.0.1:3001",
+        "mobile": "http://127.0.0.1:3001"
+    },
+    "apiPortScanLimit": 20,
     "frontend": {
         "repo": "https://github.com/celiy/cht-client-mecarvit.git"
     },
