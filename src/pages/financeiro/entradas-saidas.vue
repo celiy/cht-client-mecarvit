@@ -14,7 +14,13 @@
                 id="entradas"
                 class="mt-2 mb-4 scroll-mt-24 border-t border-b pt-2 pb-4"
             >
-                <h3 class="mb-3 text-lg font-semibold">Entradas</h3>
+                <div class="mb-4">
+                    <h3 class="mb-1!">Entradas</h3>
+                    <p class="text-muted-foreground! sm:w-1/2">
+                        Entradas correspondem a todos os valores recebidos pela empresa, seja por
+                        vendas, serviços ou outros recebimentos.
+                    </p>
+                </div>
 
                 <div class="mb-4">
                     <FilterInputs
@@ -61,7 +67,13 @@
                 id="saidas"
                 class="mt-10 scroll-mt-24"
             >
-                <h3 class="mb-3 text-lg font-semibold">Saídas</h3>
+                <div class="mb-4">
+                    <h3 class="mb-1!">Saídas</h3>
+                    <p class="text-muted-foreground! sm:w-1/2">
+                        Saídas são todos os valores pagos pela empresa, como custos, despesas e
+                        outros pagamentos.
+                    </p>
+                </div>
 
                 <div class="mb-4">
                     <FilterInputs
@@ -419,7 +431,9 @@ function toOsForm(
         dataInicio: formatDateInputValue(os.dataInicio),
         dataConclusao: formatDateInputValue(os.dataConclusao),
         dataLimitePagamento: dateToInputValue(
-            os.registroEntradaSaida ? os.registroEntradaSaida.dataLimitePagamento : os.dataLimitePagamento
+            os.registroEntradaSaida
+                ? os.registroEntradaSaida.dataLimitePagamento
+                : os.dataLimitePagamento
         ),
         diagnosticoCliente: os.diagnosticoCliente ?? "",
         diagnosticoMecanico: os.diagnosticoMecanico ?? "",
@@ -673,7 +687,17 @@ export default defineComponent({
         currentDialogItemValues(): RegistroFormValues {
             const next = { ...this.dialogItem };
 
-            for (const fieldId of ["id", "criadoEm", "modificadoEm", "tipo", "nome", "valor", "valorPago", "descricao", "dataLimitePagamento"]) {
+            for (const fieldId of [
+                "id",
+                "criadoEm",
+                "modificadoEm",
+                "tipo",
+                "nome",
+                "valor",
+                "valorPago",
+                "descricao",
+                "dataLimitePagamento"
+            ]) {
                 const value = this.itemDialog()?.getFieldValue(fieldId);
 
                 if (value !== undefined) {
@@ -890,7 +914,9 @@ export default defineComponent({
                 this.dialogPagamentos = this.mapPagamentosToFormRows(pagamentos);
                 this.syncDialogValorPago();
                 this.onPaymentModalCancel();
-                this.$toast.success("Pagamentos adicionados ao lançamento. Salve o lançamento quando terminar.");
+                this.$toast.success(
+                    "Pagamentos adicionados ao lançamento. Salve o lançamento quando terminar."
+                );
 
                 return;
             }
