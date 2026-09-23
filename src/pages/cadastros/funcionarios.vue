@@ -1,6 +1,7 @@
 <template>
     <CrudListPage
         ref="listPage"
+
         title="Funcionários"
         :filters="funcionarioFilters"
         :loading="loadingFuncionarios"
@@ -23,6 +24,7 @@
     >
         <ItemViewEdit
             ref="itemDialog"
+
             v-model:is-open="dialogOpen"
             :header="dialogHeader"
             :mode="dialogMode"
@@ -38,10 +40,27 @@
             @click:select-action="onUsuarioSelectAction"
             @search:external="onSearchExternal"
         >
-            <template #formActions>
+            <template
+                v-if="dialogMode !== 'view'"
+                #select-inside-empty-panel="{ field }"
+            >
                 <Button
-                    v-if="dialogMode !== 'view' && !dialogUsuarioSuperadmin"
+                    v-if="field.id === 'cargoId'"
 
+                    type="button"
+                    variant="outline"
+                    left-icon="fa-plus"
+                    label="Cadastrar cargo"
+
+                    @click="onCargoSelectInsidePanel"
+                />
+            </template>
+
+            <template
+                v-if="dialogMode !== 'view' && !dialogUsuarioSuperadmin"
+                #formActions
+            >
+                <Button
                     type="button"
                     variant="secondary"
                     label="Resetar senha"
@@ -69,6 +88,7 @@
 
         <ItemViewEdit
             ref="cargoDialog"
+
             v-model:is-open="cargoDialogOpen"
             header="Novo cargo"
             mode="create"
@@ -92,6 +112,7 @@ import { PASSWORD_MIN_LENGTH } from "@shared/validators/password";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
+import Button from "@design/components/Button.vue";
 import ConfirmationModal from "@design/components/custom/ConfirmationModal.vue";
 import {
     ATIVO_FILTER_OPTIONS,
@@ -183,6 +204,7 @@ export default defineComponent({
     name: "MecarvitFuncionariosPage",
 
     components: {
+        Button,
         ConfirmationModal,
         CrudListPage,
         ItemViewEdit
@@ -312,13 +334,14 @@ export default defineComponent({
                         external: true,
                         field: "nome"
                     },
-                    selectAction: this.dialogMode === "view"
-                        ? undefined
-                        : {
-                            icon: "fa-plus",
-                            side: "right",
-                            tooltip: "Cadastrar cargo"
-                        }
+                    selectAction:
+                        this.dialogMode === "view"
+                            ? undefined
+                            : {
+                                  icon: "fa-plus",
+                                  side: "right",
+                                  tooltip: "Cadastrar cargo"
+                              }
                 });
             }
 
@@ -328,7 +351,8 @@ export default defineComponent({
                     label: "Ativo",
                     type: "checkbox",
                     checkboxStyle: "switch",
-                    description: "Quando desativado, a entidade não será indexada nem poderá ser usada. Isso funciona como exclusão lógica, sem perder os dados."
+                    description:
+                        "Quando desativado, a entidade não será indexada nem poderá ser usada. Isso funciona como exclusão lógica, sem perder os dados."
                 });
             }
 
@@ -472,11 +496,7 @@ export default defineComponent({
                         ? undefined
                         : selected;
 
-                this.cargos = withSelectedItem(
-                    rows,
-                    selectedForList,
-                    (cargo) => String(cargo.id)
-                );
+                this.cargos = withSelectedItem(rows, selectedForList, (cargo) => String(cargo.id));
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os cargos.");
             }
@@ -521,11 +541,7 @@ export default defineComponent({
             this.dialogOpen = true;
 
             if (cargo) {
-                this.cargos = withSelectedItem(
-                    this.cargos,
-                    cargo,
-                    (entry) => String(entry.id)
-                );
+                this.cargos = withSelectedItem(this.cargos, cargo, (entry) => String(entry.id));
             }
         },
 
@@ -546,12 +562,13 @@ export default defineComponent({
                     `/api/usuario/${cpf}`
                 );
                 const user = response.data.data;
-                const cargo = user.cargoId != null
-                    ? {
-                        id: user.cargoId,
-                        nome: user.cargoNome ?? String(user.cargoId)
-                    }
-                    : undefined;
+                const cargo =
+                    user.cargoId != null
+                        ? {
+                              id: user.cargoId,
+                              nome: user.cargoNome ?? String(user.cargoId)
+                          }
+                        : undefined;
 
                 this.openDialog(mode, toFormValues(user), cargo, user);
             } catch (error) {
@@ -607,19 +624,28 @@ export default defineComponent({
             }
         },
 
-        onUsuarioSelectAction(payload: { id: string }) {
-            if (payload.id !== "cargoId") {
-                return;
-            }
-
-            if (this.dialogMode === "view") {
-                return;
-            }
-
+        openCargoCreateDialog() {
             this.cargoDialogKey += 1;
             this.cargoItem = emptyCargoForm();
             this.cargoSaving = false;
             this.cargoDialogOpen = true;
+        },
+
+        onCargoSelectInsidePanel() {
+            if (this.dialogMode === "view") {
+                return;
+            }
+
+            this.itemDialog()?.closeSelect("cargoId");
+            this.openCargoCreateDialog();
+        },
+
+        onUsuarioSelectAction(payload: { id: string }) {
+            if (payload.id !== "cargoId" || this.dialogMode === "view") {
+                return;
+            }
+
+            this.openCargoCreateDialog();
         },
 
         onSearchExternal(payload: { id: string; field: string; value: string }) {

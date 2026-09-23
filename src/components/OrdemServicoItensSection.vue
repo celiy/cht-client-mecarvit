@@ -7,14 +7,14 @@
                         <tr class="text-sm font-semibold text-foreground">
                             <th
                                 scope="col"
-                                class="w-32 border-b px-3 py-2 text-left sm:w-52"
+                                class="border-b px-3 py-2 text-left"
                             >
                                 Serviço
                             </th>
 
                             <th
                                 scope="col"
-                                class="w-16 border-b border-l px-3 py-2 text-left sm:w-32"
+                                class="w-16 border-b border-l px-3 py-2 text-left sm:w-26"
                             >
                                 <span v-if="$project.device.isMobile">Qtd.</span>
                                 <span v-else>Quantidade</span>
@@ -56,8 +56,10 @@
 
                                 class="text-foreground"
                             >
-                                <td class="border-b px-3 py-2 align-middle">
-                                    <span class="block truncate">{{ row.servicoNome || "—" }}</span>
+                                <td class="min-w-0 border-b px-3 py-2 align-top break-words">
+                                    <span class="block break-words whitespace-normal">
+                                        {{ row.servicoNome || "—" }}
+                                    </span>
                                 </td>
 
                                 <td class="border-b border-l px-3 py-2 align-middle tabular-nums">
@@ -88,10 +90,13 @@
                                 v-for="(row, index) in items"
                                 :key="`item-${index}`"
                             >
-                                <td class="border-b align-middle focus-within:bg-accent/40">
+                                <td
+                                    class="min-w-0 border-b align-top break-words focus-within:bg-accent/40"
+                                >
                                     <Select
                                         :id="committedFieldId(index, 'servico')"
                                         combobox
+                                        combobox-multiline
                                         variant="transparent"
                                         :query="row.servicoNome"
                                         :model-value="
@@ -105,7 +110,23 @@
                                         @update:query="onItemServicoNomeInput(index, $event)"
                                         @update:value="onItemServicoSelectValue(index, $event)"
                                         @search:external="onServicoSearchExternal"
-                                    />
+                                    >
+                                        <template #inside-empty-panel>
+                                            <span
+                                                v-if="
+                                                    servicoEnterHintVisible(
+                                                        row.servicoNome,
+                                                        row.servicoId
+                                                    )
+                                                "
+
+                                                :data-os-suggestions-empty="true"
+                                                class="mt-1 block px-1 text-xs text-muted-foreground"
+                                            >
+                                                Pressione Enter para usar este nome.
+                                            </span>
+                                        </template>
+                                    </Select>
                                 </td>
 
                                 <td
@@ -155,6 +176,7 @@
 
                                 <td class="border-b border-l px-1 py-1 text-center align-middle">
                                     <Button
+                                        v-tooltip="'Remover serviço'"
                                         type="button"
                                         variant="transparent"
                                         size="small"
@@ -196,8 +218,15 @@
                                     -->
                                         <template #inside-empty-panel>
                                             <span
-                                                data-os-suggestions-empty
-                                                class="block px-1 text-xs text-muted-foreground"
+                                                v-if="
+                                                    servicoEnterHintVisible(
+                                                        draft.servicoNome,
+                                                        draft.servicoId
+                                                    )
+                                                "
+
+                                                :data-os-suggestions-empty="true"
+                                                class="mt-1 block px-1 text-xs text-muted-foreground"
                                             >
                                                 Pressione Enter para usar este nome.
                                             </span>
@@ -246,6 +275,7 @@
 
                                 <td class="border-l px-1 py-1 text-center align-middle">
                                     <Button
+                                        v-tooltip="'Adicionar serviço'"
                                         type="button"
                                         variant="transparent"
                                         size="small"
@@ -271,7 +301,8 @@
             variant="destructive"
             type="alert"
             :description="draftErrorMessage"
-            :hover-effect="false"
+
+            @click="clearDraftErrorMessage"
         />
     </section>
 </template>
@@ -357,6 +388,23 @@ function suggestionsPanelHasOptions(): boolean {
     return !(emptyHint instanceof HTMLElement && emptyHint.getClientRects().length > 0);
 }
 
+function servicoEnterHintVisible(
+    nome: string,
+    servicoId: string | number | null | undefined
+): boolean {
+    const trimmed = String(nome ?? "").trim();
+
+    if (!trimmed) {
+        return false;
+    }
+
+    if (servicoId != null && String(servicoId) !== "") {
+        return false;
+    }
+
+    return true;
+}
+
 export default defineComponent({
     name: "OrdemServicoItensSection",
 
@@ -432,6 +480,8 @@ export default defineComponent({
     },
 
     methods: {
+        servicoEnterHintVisible,
+
         moneyLabel(value: string): string {
             const amount = parseMoneyInput(value);
 
@@ -668,6 +718,10 @@ export default defineComponent({
 
         removeItem(index: number) {
             this.emitItems(this.items.filter((_, i) => i !== index));
+        },
+
+        clearDraftErrorMessage() {
+            this.localErrors = {};
         }
     }
 });
