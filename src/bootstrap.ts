@@ -1,10 +1,15 @@
 import type { App } from "vue";
 import type { Router } from "vue-router";
 import { http } from "@base/http";
+import { onRealtimeEvent } from "@base/realtime";
+import { toast } from "@design/toast/toast";
+import { isCadastroRealtimePayload } from "@shared/mecarvit/realtime";
 import {
     loadCurrentCompany,
     loadCurrentUser,
-    mecarvitPlugin
+    mecarvitPlugin,
+    mecarvit,
+    isUsuarioSuperadmin
 } from "./js/mecarvit";
 
 export function isAuthenticated(): boolean {
@@ -31,8 +36,21 @@ export function setupAuthGuard(router: Router): void {
 }
 
 export async function installClientPlugins(app: App, router: Router): Promise<void> {
+    void router;
     app.use(mecarvitPlugin);
 
     await loadCurrentUser();
     await loadCurrentCompany();
+
+    onRealtimeEvent((event) => {
+        if (!isUsuarioSuperadmin(mecarvit.user ?? {})) {
+            return;
+        }
+
+        if (!isCadastroRealtimePayload(event.payload)) {
+            return;
+        }
+
+        toast.info(`${event.payload.actorNome} cadastrou ${event.payload.label}`);
+    });
 }

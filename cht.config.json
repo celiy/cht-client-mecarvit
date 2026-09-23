@@ -13,8 +13,10 @@
         "repo": "https://github.com/celiy/cht-client-mecarvit.git"
     },
     "backend": {
+        "dir": "cht-backend-mecarvit",
         "repo": "https://github.com/celiy/cht-backend-mecarvit.git",
-        "script": "dev"
+        "cmd": "npm run dev",
+        "packageWithElectron": true
     },
     "publish": {
         "provider": "github",

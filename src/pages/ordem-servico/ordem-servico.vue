@@ -259,7 +259,8 @@ export default defineComponent({
                 {
                     label: "Status",
                     field: "statusBadge",
-                    position: "center"
+                    position: "center",
+                    badgeProps: { variantStyle: "bordered" }
                 },
                 { label: "Data limite", field: "dataLimiteLabel", position: "end" }
             ] as TableHeader[],

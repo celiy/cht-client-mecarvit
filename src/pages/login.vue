@@ -3,10 +3,12 @@
 
     <main class="flex min-h-screen flex-col items-center p-6">
         <div class="container-center mt-12 mb-4">
-            <img
+            <Image
                 class="mx-auto mb-3 h-24 w-24"
+                image-class="h-24 w-24 object-contain"
                 :src="logo"
                 alt="Mecarvit"
+                :draggable="false"
             />
 
             <h1>Mecarvit</h1>

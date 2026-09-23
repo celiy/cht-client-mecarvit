@@ -230,11 +230,10 @@ export default defineComponent({
             immediate: true,
             handler(value: unknown) {
                 if (!isCadastrarQuery(value)) {
-                    this.$emit("close-create");
                     return;
                 }
 
-                this.$nextTick(() => {
+                void this.clearCadastrarQuery().then(() => {
                     this.$emit("create");
                 });
             }
@@ -246,12 +245,12 @@ export default defineComponent({
             const query = { ...this.$route.query };
 
             if (!isCadastrarQuery(query.cadastrar)) {
-                return;
+                return Promise.resolve();
             }
 
             delete query.cadastrar;
 
-            void this.$router.replace({
+            return this.$router.replace({
                 query,
                 hash: this.$route.hash
             });
