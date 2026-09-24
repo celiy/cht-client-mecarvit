@@ -7,10 +7,14 @@
         :loading="loadingClientes"
         :headers="tableHeaders"
         :rows="tableRows"
+        :actions="rowActions"
         :page-count="pageCount"
         pagination-id="pagination-clientes"
         :pagination-key="filters || 'all'"
         delete-name-field="nome"
+        :show-create="canCreate"
+        :show-export="canExport"
+        :exporting="exporting"
         empty-title="Nenhum cliente encontrado."
         empty-description="Ajuste os filtros ou cadastre um novo cliente."
 
@@ -21,6 +25,7 @@
         @page="onPage"
         @action="onRowAction"
         @delete="onDelete"
+        @export="onExport"
     >
         <ItemViewEdit
             ref="itemDialog"
@@ -242,7 +247,9 @@ import { HttpError } from "@base/http";
 import { enderecoOptionLabel, uniqueEnderecoIds } from "../../js/enderecoLabel";
 import {
     ATIVO_FILTER_OPTIONS,
+    CRUD_ROW_ACTIONS,
     documentDigits,
+    fetchAllList,
     listQuery,
     notifyHttpError,
     pageCountFromTotal,
@@ -252,6 +259,13 @@ import {
     type ListResponse,
     withSelectedItem
 } from "../../js/crudHttp";
+import {
+    currentCanCreate,
+    currentCanDelete,
+    currentCanExport,
+    currentCanSeePii
+} from "../../js/mecarvit";
+import { downloadTablePdf } from "../../js/exportTablePdf";
 
 interface StatusOsApi {
     id: number;
@@ -410,7 +424,7 @@ export default defineComponent({
                 { type: "input", value: "documento", label: "Documento" },
                 { type: "input", value: "cel", label: "Celular", inputType: "phone" }
             ] as FilterDef[],
-            tableHeaders: [
+            tableHeadersBase: [
                 { label: "Nome", field: "nome", position: "start" },
                 { label: "Documento", field: "documento", position: "start" },
                 { label: "Celular", field: "cel", position: "start" }
@@ -455,11 +469,40 @@ export default defineComponent({
             clienteOsFormFuncionarios: [] as UsuarioApi[],
             clienteOsPaymentModalOpen: false,
             clienteOsPaymentRows: [] as PagamentoFormRow[],
-            clienteOsPaymentValorTotal: 0
+            clienteOsPaymentValorTotal: 0,
+            exporting: false
         };
     },
 
     computed: {
+        canCreate(): boolean {
+            return currentCanCreate("clientes");
+        },
+
+        canExport(): boolean {
+            return currentCanExport("clientes");
+        },
+
+        canSeePii(): boolean {
+            return currentCanSeePii("clientes");
+        },
+
+        tableHeaders(): TableHeader[] {
+            if (this.canSeePii) {
+                return this.tableHeadersBase;
+            }
+
+            return this.tableHeadersBase.filter((header) => header.field !== "documento");
+        },
+
+        rowActions() {
+            if (currentCanDelete("clientes")) {
+                return CRUD_ROW_ACTIONS;
+            }
+
+            return CRUD_ROW_ACTIONS.filter((action) => action.value !== "delete" && !action.separator);
+        },
+
         tableRows() {
             return this.clientes as unknown as Array<Record<string, unknown>>;
         },
@@ -494,7 +537,7 @@ export default defineComponent({
         },
 
         dialogFields() {
-            return clienteFormFields({
+            const fields = clienteFormFields({
                 isCreate: this.dialogMode === "create",
                 isView: this.dialogMode === "view",
                 documento: this.dialogItem.documento,
@@ -502,6 +545,12 @@ export default defineComponent({
                 veiculoOptions: this.veiculoOptions,
                 includeVehicles: true
             });
+
+            if (this.dialogMode === "create" || this.canSeePii) {
+                return fields;
+            }
+
+            return fields.filter((field) => field.id !== "documento");
         },
 
         enderecoFields() {
@@ -743,11 +792,10 @@ export default defineComponent({
 
             return itens.reduce((sum, item) => {
                 const qty = Number(item.quantidade);
-                const obra = parseMoneyInput(item.valorObra) ?? 0;
-                const pecas = parseMoneyInput(item.valorPecas) ?? 0;
+                const valor = parseMoneyInput(item.valor) ?? 0;
                 const quantidade = Number.isFinite(qty) && qty > 0 ? qty : 0;
 
-                return sum + quantidade * (obra + pecas);
+                return sum + quantidade * valor;
             }, 0);
         },
 
@@ -892,6 +940,27 @@ export default defineComponent({
                 this.pageCount = 0;
             } finally {
                 this.loadingClientes = false;
+            }
+        },
+
+        async onExport() {
+            this.exporting = true;
+
+            try {
+                const rows = await fetchAllList<ClienteApi>(
+                    this.$http.get.bind(this.$http),
+                    "/api/cliente",
+                    this.filters
+                );
+                downloadTablePdf(
+                    "Clientes",
+                    this.tableHeaders,
+                    rows as unknown as Array<Record<string, unknown>>
+                );
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível exportar a tabela.");
+            } finally {
+                this.exporting = false;
             }
         },
 

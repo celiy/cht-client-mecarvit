@@ -4,10 +4,14 @@
 
         title="Entradas e saídas"
         :show-filters="false"
+        :show-create="canCreate"
+        :show-export="canExport"
+        :exporting="exporting"
 
         @create="onCreate"
         @close-create="closeDialog"
         @delete="onDelete"
+        @export="onExport"
     >
         <template #body>
             <section
@@ -267,6 +271,7 @@ import { sumPagamentosValor, type PagamentoFormRow } from "../../js/pagamentoOpt
 import {
     CRUD_ROW_ACTIONS_WITH_PAGAMENTO,
     documentDigits,
+    fetchAllList,
     formatMoneyBrl,
     listQuery,
     notifyHttpError,
@@ -276,7 +281,8 @@ import {
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
-import { excludeCurrentUsuario } from "../../js/mecarvit";
+import { currentCanCreate, currentCanDelete, currentCanExport, excludeCurrentUsuario } from "../../js/mecarvit";
+import { downloadTablesPdf } from "../../js/exportTablePdf";
 
 interface OrdemServicoLinkApi {
     id: number;
@@ -324,8 +330,7 @@ interface OrdemServicoItemApi {
     servicoId: number;
     servicoNome?: string;
     quantidade: number;
-    valorObra: number;
-    valorPecas?: number | null;
+    valor: number;
 }
 
 interface OrdemServicoApi {
@@ -357,11 +362,7 @@ function mapOsItensFromApi(itens: OrdemServicoItemApi[] | undefined): OrdemServi
         servicoId: item.servicoId,
         servicoNome: item.servicoNome ?? "",
         quantidade: String(item.quantidade),
-        valorObra: moneyAmountToInputDigits(item.valorObra),
-        valorPecas:
-            item.valorPecas != null && item.valorPecas !== 0
-                ? moneyAmountToInputDigits(item.valorPecas)
-                : ""
+        valor: moneyAmountToInputDigits(item.valor)
     }));
 }
 
@@ -471,7 +472,6 @@ export default defineComponent({
 
     data() {
         return {
-            rowActions: CRUD_ROW_ACTIONS_WITH_PAGAMENTO,
             entradaOsFilterOptions: {
                 ordemServicoId: [] as Array<{ label: string; value: string }>
             },
@@ -520,11 +520,30 @@ export default defineComponent({
                 ordemServicoId: number | null;
                 valorTotal: number;
             } | null,
-            scrollFrame: null as number | null
+            scrollFrame: null as number | null,
+            exporting: false
         };
     },
 
     computed: {
+        canCreate(): boolean {
+            return currentCanCreate("financeiro");
+        },
+
+        canExport(): boolean {
+            return currentCanExport("financeiro");
+        },
+
+        rowActions() {
+            if (currentCanDelete("financeiro")) {
+                return CRUD_ROW_ACTIONS_WITH_PAGAMENTO;
+            }
+
+            return CRUD_ROW_ACTIONS_WITH_PAGAMENTO.filter(
+                (action) => action.value !== "delete" && !action.separator
+            );
+        },
+
         pagoFilterDef(): FilterDef {
             return {
                 type: "option",
@@ -1126,6 +1145,46 @@ export default defineComponent({
 
         async getSaidas() {
             await this.getRegistros("saida");
+        },
+
+        async onExport() {
+            this.exporting = true;
+
+            try {
+                const [entradas, saidas] = await Promise.all([
+                    fetchAllList<RegistroApi>(
+                        this.$http.get.bind(this.$http),
+                        "/api/regentradasaida",
+                        [this.entradaFilters, toQueryString({ tipo: "entrada" })]
+                            .filter(Boolean)
+                            .join("&")
+                    ),
+                    fetchAllList<RegistroApi>(
+                        this.$http.get.bind(this.$http),
+                        "/api/regentradasaida",
+                        [this.saidaFilters, toQueryString({ tipo: "saida" })]
+                            .filter(Boolean)
+                            .join("&")
+                    )
+                ]);
+
+                downloadTablesPdf("Entradas e saídas", [
+                    {
+                        title: "Entradas",
+                        headers: this.tableHeaders,
+                        rows: entradas.map((row) => this.toTableRow(row))
+                    },
+                    {
+                        title: "Saídas",
+                        headers: this.tableHeaders,
+                        rows: saidas.map((row) => this.toTableRow(row))
+                    }
+                ]);
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível exportar a tabela.");
+            } finally {
+                this.exporting = false;
+            }
         },
 
         async getRegistros(tipo: "entrada" | "saida") {

@@ -89,6 +89,26 @@ export function listQuery(filters: string, page: number, limit: number): string 
     return [filters, paging].filter(Boolean).join("&");
 }
 
+type ListGet = <T>(url: string) => Promise<{ data: ListResponse<T> }>;
+
+/** Fetches every row that matches the current filters, ignoring the UI page size. */
+export async function fetchAllList<T>(
+    get: ListGet,
+    path: string,
+    filters: string
+): Promise<T[]> {
+    const first = await get<T>(`${path}?${listQuery(filters, 1, 1)}`);
+    const total = Number(first.data.total ?? first.data.data?.length ?? 0);
+
+    if (total <= 1) {
+        return first.data.data ?? [];
+    }
+
+    const all = await get<T>(`${path}?${listQuery(filters, 1, total)}`);
+
+    return all.data.data ?? [];
+}
+
 export function pageCountFromTotal(total: unknown, limit: unknown, fallbackLimit: number): number {
     const totalNum = Number(total ?? 0);
     const limitNum = Number(limit ?? fallbackLimit);

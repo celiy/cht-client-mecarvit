@@ -24,16 +24,7 @@
                                 scope="col"
                                 class="overflow-x-hidden border-b border-l px-3 py-2 text-left text-nowrap"
                             >
-                                <span v-if="$project.device.isMobile">Val. obra</span>
-                                <span v-else>Valor obra</span>
-                            </th>
-
-                            <th
-                                scope="col"
-                                class="overflow-x-hidden border-b border-l px-3 py-2 text-left text-nowrap"
-                            >
-                                <span v-if="$project.device.isMobile">Val. peças</span>
-                                <span v-else>Valor peças</span>
+                                Valor
                             </th>
 
                             <th
@@ -67,17 +58,13 @@
                                 </td>
 
                                 <td class="border-b border-l px-3 py-2 align-middle tabular-nums">
-                                    {{ moneyLabel(row.valorObra) }}
-                                </td>
-
-                                <td class="border-b border-l px-3 py-2 align-middle tabular-nums">
-                                    {{ moneyLabel(row.valorPecas) }}
+                                    {{ moneyLabel(row.valor) }}
                                 </td>
                             </tr>
 
                             <tr v-if="items.length === 0">
                                 <td
-                                    colspan="4"
+                                    colspan="3"
                                     class="px-3 py-6 text-center text-muted-foreground"
                                 >
                                     Nenhum serviço lançado.
@@ -148,29 +135,14 @@
                                     class="border-b border-l align-middle focus-within:bg-accent/40"
                                 >
                                     <Input
-                                        :id="committedFieldId(index, 'valorObra')"
+                                        :id="committedFieldId(index, 'valor')"
                                         type="money"
                                         variant="transparent"
                                         no-shadow
-                                        :value="row.valorObra"
+                                        :value="row.valor"
 
                                         @keydown.enter="preventRowEnter"
-                                        @update:value="patchItem(index, 'valorObra', $event)"
-                                    />
-                                </td>
-
-                                <td
-                                    class="border-b border-l align-middle focus-within:bg-accent/40"
-                                >
-                                    <Input
-                                        :id="committedFieldId(index, 'valorPecas')"
-                                        type="money"
-                                        variant="transparent"
-                                        no-shadow
-                                        :value="row.valorPecas"
-
-                                        @keydown.enter="preventRowEnter"
-                                        @update:value="patchItem(index, 'valorPecas', $event)"
+                                        @update:value="patchItem(index, 'valor', $event)"
                                     />
                                 </td>
 
@@ -249,27 +221,14 @@
 
                                 <td class="border-l align-middle focus-within:bg-accent/40">
                                     <Input
-                                        id="os-item-valor-obra"
+                                        id="os-item-valor"
                                         type="money"
                                         variant="transparent"
                                         no-shadow
-                                        :value="draft.valorObra"
+                                        :value="draft.valor"
 
-                                        @keydown.enter="onValorObraEnter"
-                                        @update:value="updateDraft('valorObra', $event)"
-                                    />
-                                </td>
-
-                                <td class="border-l align-middle focus-within:bg-accent/40">
-                                    <Input
-                                        id="os-item-valor-pecas"
-                                        type="money"
-                                        variant="transparent"
-                                        no-shadow
-                                        :value="draft.valorPecas"
-
-                                        @keydown.enter="onValorPecasEnter"
-                                        @update:value="updateDraft('valorPecas', $event)"
+                                        @keydown.enter="onValorEnter"
+                                        @update:value="updateDraft('valor', $event)"
                                     />
                                 </td>
 
@@ -324,8 +283,7 @@ export type OrdemServicoItemFormRow = {
     servicoId?: number;
     servicoNome: string;
     quantidade: string;
-    valorObra: string;
-    valorPecas: string;
+    valor: string;
 };
 
 type ServicoSuggestion = {
@@ -342,8 +300,7 @@ type ServicoSuggestion = {
 const FIELD_IDS = {
     servico: "os-item-servico-nome",
     quantidade: "os-item-quantidade",
-    valorObra: "os-item-valor-obra",
-    valorPecas: "os-item-valor-pecas"
+    valor: "os-item-valor"
 } as const;
 
 type DraftField = keyof typeof FIELD_IDS;
@@ -352,8 +309,7 @@ function emptyDraft(): OrdemServicoItemFormRow {
     return {
         servicoNome: "",
         quantidade: "1",
-        valorObra: "",
-        valorPecas: ""
+        valor: ""
     };
 }
 
@@ -654,19 +610,10 @@ export default defineComponent({
 
         onQuantidadeEnter(event: KeyboardEvent) {
             event.preventDefault();
-            this.focusField("valorObra");
+            this.focusField("valor");
         },
 
-        onValorObraEnter(event: KeyboardEvent) {
-            event.preventDefault();
-            this.focusField("valorPecas");
-        },
-
-        /**
-         * The last field is the only place Enter commits: name and at least one
-         * price still have to pass, but a filled work value no longer skips parts.
-         */
-        onValorPecasEnter(event: KeyboardEvent) {
+        onValorEnter(event: KeyboardEvent) {
             event.preventDefault();
             this.commitDraft();
         },
@@ -675,10 +622,7 @@ export default defineComponent({
             const errors: Record<string, string> = {};
             const nome = this.draft.servicoNome.trim();
             const qty = Number(this.draft.quantidade);
-            const obra = parseMoneyInput(this.draft.valorObra);
-            const pecas = parseMoneyInput(this.draft.valorPecas);
-            const hasObra = obra != null && obra > 0;
-            const hasPecas = pecas != null && pecas > 0;
+            const valor = parseMoneyInput(this.draft.valor);
 
             if (!nome) {
                 errors.servicoNome = "Nome do serviço é obrigatório.";
@@ -688,8 +632,8 @@ export default defineComponent({
                 errors.quantidade = "Quantidade inválida.";
             }
 
-            if (!hasObra && !hasPecas) {
-                errors.valorObra = "Informe um valor de obra ou de peças.";
+            if (valor == null || valor <= 0) {
+                errors.valor = "Informe o valor.";
             }
 
             this.localErrors = errors;
@@ -706,8 +650,7 @@ export default defineComponent({
                 servicoId: this.draft.servicoId,
                 servicoNome: this.draft.servicoNome.trim(),
                 quantidade: String(Math.round(Number(this.draft.quantidade))),
-                valorObra: this.draft.valorObra,
-                valorPecas: this.draft.valorPecas
+                valor: this.draft.valor
             };
 
             this.emitItems([...this.items, row]);

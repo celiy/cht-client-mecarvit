@@ -1,6 +1,11 @@
 import type { App } from "vue";
 import { reactive } from "vue";
 import { http } from "@base/http";
+import {
+    hasPermission,
+    isSuperadmin,
+    type AccessAreaKey
+} from "@shared/mecarvit/access";
 
 export interface MecarvitUser {
     cpf: string;
@@ -75,19 +80,43 @@ export function currentUsuarioCpfDigits(): string {
     return cpf.replace(/\D/g, "");
 }
 
-export function isSuperadminNivelAcesso(nivelAcesso: string | undefined): boolean {
-    return String(nivelAcesso ?? "").includes("0");
-}
-
 export function isUsuarioSuperadmin(user: {
     fundador?: boolean;
     nivelAcesso?: string;
 }): boolean {
-    return Boolean(user.fundador) || isSuperadminNivelAcesso(user.nivelAcesso);
+    return Boolean(user.fundador) || isSuperadmin(String(user.nivelAcesso ?? ""));
+}
+
+export function currentNivelAcesso(): string {
+    return String(mecarvit.user?.nivelAcesso ?? "");
+}
+
+export function currentHasPermission(key: string): boolean {
+    return hasPermission(currentNivelAcesso(), key);
+}
+
+export function currentCanCreate(area: AccessAreaKey): boolean {
+    return currentHasPermission(`${area}.criar`);
+}
+
+export function currentCanExport(area: AccessAreaKey): boolean {
+    return currentHasPermission(`${area}.exportar`);
+}
+
+export function currentCanDelete(area: AccessAreaKey): boolean {
+    return currentHasPermission(`${area}.excluir`);
+}
+
+export function currentCanSeePii(area: "clientes" | "funcionarios"): boolean {
+    return currentHasPermission(`${area}.pii`);
+}
+
+export function currentIsSuperadmin(): boolean {
+    return isUsuarioSuperadmin(mecarvit.user ?? {});
 }
 
 export function excludeSuperadminCargos<T extends { nivelAcesso?: string }>(cargos: T[]): T[] {
-    return cargos.filter((cargo) => !isSuperadminNivelAcesso(cargo.nivelAcesso));
+    return cargos.filter((cargo) => !isSuperadmin(String(cargo.nivelAcesso ?? "")));
 }
 
 export function excludeCurrentUsuario<T extends { cpf: string }>(users: T[]): T[] {

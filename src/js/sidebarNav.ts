@@ -174,7 +174,7 @@ const NAV_SECTIONS: NavSectionDef[] = [
                         }
                     ]
                 },
-                ACCESS.OS
+                ACCESS.FINANCEIRO
             )
         ]
     }
@@ -186,6 +186,27 @@ const NAV_SECTIONS: NavSectionDef[] = [
  * A section is dropped when the cargo cannot reach any of its items, so no
  * heading is left without content.
  */
+function withoutCreateIfNeeded(
+    item: SidebarNavItem,
+    nivel: string,
+    digit?: string
+): SidebarNavItem {
+    if (item.type !== "group" || !digit) {
+        return item;
+    }
+
+    const criar = digit.replace(/\.editar$/, ".criar");
+
+    if (criar === digit || hasAccess(nivel, criar)) {
+        return item;
+    }
+
+    return {
+        ...item,
+        links: item.links.filter((link) => link.leftIcon !== "fa-plus")
+    };
+}
+
 export function sidebarNavItems(nivelAcesso: string | undefined): SidebarNavEntry[] {
     const nivel = String(nivelAcesso ?? "");
     const entries: SidebarNavEntry[] = [];
@@ -203,8 +224,8 @@ export function sidebarNavItems(nivelAcesso: string | undefined): SidebarNavEntr
             entries.push({ type: "section", label: section.label });
         }
 
-        for (const { item } of allowed) {
-            entries.push(item);
+        for (const { item, digit } of allowed) {
+            entries.push(withoutCreateIfNeeded(item, nivel, digit));
         }
     }
 

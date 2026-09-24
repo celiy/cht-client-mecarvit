@@ -12,6 +12,8 @@
         delete-name-field="idLabel"
         :actions="rowActions"
         :filter-select-options="filterSelectOptions"
+        :show-export="canExport"
+        :exporting="exporting"
         empty-title="Nenhuma ordem de serviço encontrada."
         empty-description="Ajuste os filtros ou cadastre uma nova ordem de serviço."
 
@@ -23,7 +25,29 @@
         @page="onPage"
         @action="onRowAction"
         @delete="onDelete"
+        @export="onExport"
     >
+        <template
+            v-if="canCreate"
+            #headerActions
+        >
+            <div class="flex flex-wrap gap-2">
+                <Button
+                    label="Cadastrar"
+                    left-icon="fa-plus"
+
+                    @click="onCreate"
+                />
+
+                <Button
+                    label="Fazer orçamento"
+                    variant="secondary"
+                    left-icon="fa-file-invoice"
+
+                    @click="onCreateOrcamento"
+                />
+            </div>
+        </template>
         <Modal
             ref="osModal"
             :is-open="dialogOpen"
@@ -50,6 +74,11 @@
                     :servico-suggestions="servicoSuggestions"
                     :pagamentos-button-label="dialogPagamentosButtonLabel"
                     :pagamentos="dialogPagamentos"
+                    :orcamento="dialogOrcamento"
+                    :restricted-edit="restrictedOsEdit"
+                    :can-see-cliente-pii="canSeeClientePii"
+                    :can-see-pagamentos="canSeePagamentos"
+                    :can-edit-itens="canEditOsItens"
 
                     @submit="onSave"
                     @search:external="onSearchExternal"
@@ -131,6 +160,7 @@ import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItens
 import { toOsForm, osDataLimitePagamento, type OrdemServicoApi } from "../../js/ordemServicoFormMap";
 import {
     documentDigits,
+    fetchAllList,
     fieldErrorsFromHttp,
     listQuery,
     notifyHttpError,
@@ -142,12 +172,29 @@ import {
 } from "../../js/crudHttp";
 import type { OptionItem } from "@design/components/internal/OptionsList.vue";
 import { formatTableLabel } from "../../js/formatTableLabel";
-import { osStatusBadge, osStatusIndicator } from "../../js/osStatusBadge";
-import { currentUsuarioCpfDigits, excludeCurrentUsuario } from "../../js/mecarvit";
+import { osPagamentoBadge, osStatusBadge, osStatusIndicator } from "../../js/osStatusBadge";
+import {
+    currentCanCreate,
+    currentCanDelete,
+    currentCanExport,
+    currentCanSeePii,
+    currentHasPermission,
+    currentUsuarioCpfDigits,
+    excludeCurrentUsuario
+} from "../../js/mecarvit";
+import { PERMISSIONS } from "@shared/mecarvit/access";
+import { downloadTablePdf } from "../../js/exportTablePdf";
 
 const OS_STATUS_ACTION_PREFIX = "status:";
 
-function buildOsRowActions(statusList: StatusOsApi[]): OptionItem[] {
+function buildOsRowActions(
+    statusList: StatusOsApi[],
+    options: {
+        canCreate: boolean;
+        canDelete: boolean;
+        canSeePagamentos: boolean;
+    }
+): OptionItem[] {
     const statusOptions: OptionItem[] = statusList.map((status) => ({
         label: formatTableLabel(status.nome),
         value: `${OS_STATUS_ACTION_PREFIX}${status.id}`,
@@ -156,16 +203,19 @@ function buildOsRowActions(statusList: StatusOsApi[]): OptionItem[] {
 
     const actions: OptionItem[] = [
         { label: "Visualizar", value: "inspect", icon: "fa-eye" },
-        { label: "Editar", value: "edit", icon: "fa-pen" },
-        {
+        { label: "Editar", value: "edit", icon: "fa-pen" }
+    ];
+
+    if (options.canSeePagamentos) {
+        actions.push({
             label: "Pagamentos",
             value: "pagamentos",
             icon: "fa-money-bill",
             tooltip: "Adicione, edite, remova pagamentos"
-        }
-    ];
+        });
+    }
 
-    if (statusOptions.length > 0) {
+    if (options.canCreate && statusOptions.length > 0) {
         actions.push({
             label: "Alterar status",
             value: "status-menu",
@@ -174,10 +224,12 @@ function buildOsRowActions(statusList: StatusOsApi[]): OptionItem[] {
         });
     }
 
-    actions.push(
-        { separator: true },
-        { label: "Excluir", value: "delete", icon: "fa-trash", variant: "destructive" }
-    );
+    if (options.canDelete) {
+        actions.push(
+            { separator: true },
+            { label: "Excluir", value: "delete", icon: "fa-trash", variant: "destructive" }
+        );
+    }
 
     return actions;
 }
@@ -262,7 +314,12 @@ export default defineComponent({
                     position: "center",
                     badgeProps: { variantStyle: "bordered" }
                 },
-                { label: "Data limite", field: "dataLimiteLabel", position: "end" }
+                {
+                    label: "Pagamento",
+                    field: "pagamentoBadge",
+                    position: "center",
+                    badgeProps: { variantStyle: "bordered" }
+                }
             ] as TableHeader[],
             ordens: [] as OrdemServicoApi[],
             clientes: [] as ClienteApi[],
@@ -275,6 +332,7 @@ export default defineComponent({
             dialogOpen: false,
             dialogSaving: false,
             dialogMode: "view" as DialogMode,
+            dialogOrcamento: false,
             dialogItem: emptyOsForm("1") as OrdemServicoFormValues,
             dialogKey: 0,
             clienteSearchSeq: 0,
@@ -288,13 +346,42 @@ export default defineComponent({
             filterVeiculoSearchSeq: 0,
             page: 1,
             pageLimit: 10,
-            pageCount: 0
+            pageCount: 0,
+            exporting: false
         };
     },
 
     computed: {
+        canCreate(): boolean {
+            return currentCanCreate("os");
+        },
+
+        canExport(): boolean {
+            return currentCanExport("os");
+        },
+
+        canSeeClientePii(): boolean {
+            return currentCanSeePii("clientes");
+        },
+
+        canSeePagamentos(): boolean {
+            return currentHasPermission(PERMISSIONS.os.pagamentos);
+        },
+
+        canEditOsItens(): boolean {
+            return this.canCreate;
+        },
+
+        restrictedOsEdit(): boolean {
+            return currentHasPermission(PERMISSIONS.os.editar) && !this.canCreate;
+        },
+
         rowActions(): OptionItem[] {
-            return buildOsRowActions(this.statusOs);
+            return buildOsRowActions(this.statusOs, {
+                canCreate: this.canCreate,
+                canDelete: currentCanDelete("os"),
+                canSeePagamentos: this.canSeePagamentos
+            });
         },
 
         osFilters(): FilterDef[] {
@@ -376,24 +463,7 @@ export default defineComponent({
         },
 
         tableRows() {
-            return this.ordens.map((os) => {
-                const veiculo = this.veiculoById[os.veiculoId];
-
-                return {
-                    ...os,
-                    idLabel: `#${os.id}`,
-                    clienteNome:
-                        this.clienteNameByDocumento[os.clienteDocumento] || os.clienteDocumento,
-                    veiculoLabel: veiculo
-                        ? `${veiculo.modelo} · ${veiculo.placa}`
-                        : String(os.veiculoId),
-                    statusBadge: osStatusBadge(
-                        os.statusOsId,
-                        os.status?.nome || this.statusNameById[os.statusOsId] || "—"
-                    ),
-                    dataLimiteLabel: formatDateBr(osDataLimitePagamento(os))
-                };
-            });
+            return this.ordens.map((os) => this.mapOsTableRow(os));
         },
 
         clienteOptions() {
@@ -448,7 +518,7 @@ export default defineComponent({
 
         dialogHeader(): string {
             if (this.dialogMode === "create") {
-                return "Nova ordem de serviço";
+                return this.dialogOrcamento ? "Novo orçamento" : "Nova ordem de serviço";
             }
 
             if (this.dialogItem.id) {
@@ -489,6 +559,7 @@ export default defineComponent({
             this.dialogOpen = false;
             this.dialogSaving = false;
             this.dialogPagamentos = [];
+            this.dialogOrcamento = false;
             void this.$refs.listPage?.clearCadastrarQuery?.();
         },
 
@@ -528,25 +599,45 @@ export default defineComponent({
 
         async getLookups() {
             try {
-                const [clientes, veiculos, status, usuarios] = await Promise.all([
-                    this.$http.get<ListResponse<ClienteApi>>(
-                        "/api/cliente?limit=100&ativo=ativo,inativo"
-                    ),
-                    this.$http.get<ListResponse<VeiculoApi>>("/api/veiculo?limit=100"),
-                    this.$http.get<ListResponse<StatusOsApi>>("/api/status-os?limit=100"),
-                    this.$http.get<ListResponse<UsuarioApi>>("/api/usuario?limit=100&ativo=ativo")
-                ]);
-
-                this.clientes = clientes.data.data ?? [];
-                this.veiculos = veiculos.data.data ?? [];
-                this.formClientes = [...this.clientes];
-                this.formVeiculos = [...this.veiculos];
-                this.formFuncionarios = excludeCurrentUsuario(usuarios.data.data ?? []);
+                const status = await this.$http.get<ListResponse<StatusOsApi>>(
+                    "/api/status-os?limit=100"
+                );
                 this.statusOs = status.data.data ?? [];
-                this.syncFilterSelectOptionsFromLookups();
             } catch (error) {
-                notifyHttpError(this.$toast, error, "Não foi possível carregar os dados da OS.");
+                notifyHttpError(this.$toast, error, "Não foi possível carregar os status da OS.");
             }
+
+            const optionalGets: Array<Promise<void>> = [
+                this.$http
+                    .get<ListResponse<ClienteApi>>("/api/cliente?limit=100&ativo=ativo,inativo")
+                    .then((response) => {
+                        this.clientes = response.data.data ?? [];
+                        this.formClientes = [...this.clientes];
+                    })
+                    .catch(() => {
+                        this.clientes = [];
+                    }),
+                this.$http
+                    .get<ListResponse<VeiculoApi>>("/api/veiculo?limit=100")
+                    .then((response) => {
+                        this.veiculos = response.data.data ?? [];
+                        this.formVeiculos = [...this.veiculos];
+                    })
+                    .catch(() => {
+                        this.veiculos = [];
+                    }),
+                this.$http
+                    .get<ListResponse<UsuarioApi>>("/api/usuario?limit=100&ativo=ativo")
+                    .then((response) => {
+                        this.formFuncionarios = excludeCurrentUsuario(response.data.data ?? []);
+                    })
+                    .catch(() => {
+                        this.formFuncionarios = [];
+                    })
+            ];
+
+            await Promise.all(optionalGets);
+            this.syncFilterSelectOptionsFromLookups();
         },
 
         syncFilterSelectOptionsFromLookups() {
@@ -662,17 +753,66 @@ export default defineComponent({
             }
         },
 
+        mapOsTableRow(os: OrdemServicoApi) {
+            const veiculo = this.veiculoById[os.veiculoId] ?? os.veiculo;
+
+            return {
+                ...os,
+                idLabel: `#${os.id}`,
+                clienteNome:
+                    this.clienteNameByDocumento[os.clienteDocumento]
+                    || os.clienteNome
+                    || os.cliente?.nome
+                    || os.clienteDocumento,
+                veiculoLabel: veiculo
+                    ? `${veiculo.modelo} · ${veiculo.placa}`
+                    : String(os.veiculoId),
+                statusBadge: osStatusBadge(
+                    os.statusOsId,
+                    os.status?.nome || this.statusNameById[os.statusOsId] || "—"
+                ),
+                pagamentoBadge: osPagamentoBadge(
+                    os.pagamentoSituacao,
+                    formatDateBr(osDataLimitePagamento(os))
+                )
+            };
+        },
+
+        async onExport() {
+            this.exporting = true;
+
+            try {
+                const rows = await fetchAllList<OrdemServicoApi>(
+                    this.$http.get.bind(this.$http),
+                    "/api/ordem-servico",
+                    this.filters
+                );
+                downloadTablePdf(
+                    "Ordens de serviço",
+                    this.tableHeaders,
+                    rows.map((os) => this.mapOsTableRow(os))
+                );
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível exportar a tabela.");
+            } finally {
+                this.exporting = false;
+            }
+        },
+
         async openDialog(
             mode: DialogMode,
             item: OrdemServicoFormValues,
             pagamentos: PagamentoFormRow[] = []
         ) {
-            await this.ensureFormFuncionariosForCpfs(item.responsaveisCpfs ?? []);
+            await this.ensureFormFuncionariosForCpfs(
+                this.restrictedOsEdit ? [] : (item.responsaveisCpfs ?? [])
+            );
 
             this.dialogKey += 1;
             this.dialogMode = mode;
             this.dialogItem = item;
             this.dialogPagamentos = pagamentos;
+            this.dialogOrcamento = mode === "create" && item.statusOsId === "6";
             this.dialogSaving = false;
             this.dialogOpen = true;
 
@@ -709,6 +849,10 @@ export default defineComponent({
                 "create",
                 emptyOsForm(defaultStatus != null ? String(defaultStatus) : "1")
             );
+        },
+
+        onCreateOrcamento() {
+            this.openDialog("create", emptyOsForm("6"));
         },
 
         async openOsDialog(mode: "view" | "edit", row: Record<string, unknown>) {
@@ -777,6 +921,10 @@ export default defineComponent({
             } else if (value === "edit") {
                 void this.openOsDialog("edit", item);
             } else if (value === "pagamentos") {
+                if (!this.canSeePagamentos) {
+                    return;
+                }
+
                 const id = Number(item.id);
 
                 if (!Number.isInteger(id) || id <= 0) {
@@ -836,11 +984,10 @@ export default defineComponent({
 
             return itens.reduce((sum, item) => {
                 const qty = Number(item.quantidade);
-                const obra = parseMoneyInput(item.valorObra) ?? 0;
-                const pecas = parseMoneyInput(item.valorPecas) ?? 0;
+                const valor = parseMoneyInput(item.valor) ?? 0;
                 const quantidade = Number.isFinite(qty) && qty > 0 ? qty : 0;
 
-                return sum + quantidade * (obra + pecas);
+                return sum + quantidade * valor;
             }, 0);
         },
 
@@ -873,7 +1020,8 @@ export default defineComponent({
         },
 
         openDialogOsPagamentos() {
-            this.paymentReadonly = this.dialogMode === "view";
+            this.paymentReadonly =
+                this.dialogMode === "view" || this.dialogItem.statusOsId === "5";
             this.paymentFromDialog = true;
             this.paymentModalRows = [...this.dialogPagamentos];
             this.paymentValorTotal = this.osValorTotalFromForm();
@@ -997,15 +1145,11 @@ export default defineComponent({
 
         itensPayload(itens: OrdemServicoItemFormRow[]) {
             return itens.map((item) => {
-                const obra = parseMoneyInput(item.valorObra) ?? 0;
-                const pecas = parseMoneyInput(item.valorPecas);
-
                 return {
                     servicoId: item.servicoId,
                     servicoNome: item.servicoId ? undefined : item.servicoNome.trim(),
                     quantidade: Number(item.quantidade),
-                    valorObra: obra,
-                    valorPecas: pecas == null || pecas === 0 ? null : pecas
+                    valor: parseMoneyInput(item.valor) ?? 0
                 };
             });
         },
@@ -1375,6 +1519,19 @@ export default defineComponent({
             this.dialogSaving = true;
 
             try {
+                if (this.restrictedOsEdit && this.dialogMode !== "create") {
+                    const id = Number(this.dialogItem.id);
+
+                    await this.$http.patch(`/api/ordem-servico/${id}`, {
+                        diagnosticoMecanico: optionalTextForSave(payload.diagnosticoMecanico, false),
+                        obs: optionalTextForSave(payload.obs, false)
+                    });
+                    this.$toast.success("Ordem de serviço atualizada.");
+                    this.closeDialog();
+                    await this.getOrdens();
+                    return;
+                }
+
                 const clienteDocumento = await this.resolveClienteDocumento(payload);
 
                 await this.syncClienteCelIfNeeded(clienteDocumento, payload.clienteCel);

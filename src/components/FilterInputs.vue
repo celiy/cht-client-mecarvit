@@ -57,6 +57,18 @@
                 </div>
             </div>
 
+            <Button
+                v-if="hasAppliedFilters"
+
+                v-tooltip="'Limpar filtros'"
+                class="p-2.5"
+                aria-label="Limpar filtros"
+
+                @click="clearFilters"
+            >
+                <span class="fa-solid fa-xmark text-xs" />
+            </Button>
+
             <div class="relative h-fit w-fit">
                 <Button
                     class="p-2.5"
@@ -214,6 +226,35 @@ export default defineComponent({
             return this.filters
                 .filter(isSelectFilter)
                 .filter((filter) => this.visibleSelectKeys.includes(filter.value));
+        },
+
+        hasAppliedFilters(): boolean {
+            for (const filter of this.filters) {
+                if (isInputFilter(filter)) {
+                    if (this.serializedInputValue(filter)) {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                if (isSelectFilter(filter)) {
+                    if ((this.selectSelections[filter.value] ?? []).length > 0) {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                const selected = this.optionSelections[filter.value]?.[0];
+                const defaultChoice = filter.options.find((choice) => choice.default)?.value;
+
+                if (selected && selected !== defaultChoice) {
+                    return true;
+                }
+            }
+
+            return false;
         },
 
         dropdownOptions(): OptionItem[] {
@@ -539,6 +580,46 @@ export default defineComponent({
                 ...this.optionSelections,
                 [field]: [choice]
             };
+        },
+
+        clearFilters() {
+            const inputValues: Record<string, string> = {};
+            const selectSelections: Record<string, string[]> = {};
+            const optionSelections: Record<string, string[]> = {};
+            const visibleInputKeys: string[] = [];
+            const visibleSelectKeys: string[] = [];
+
+            for (const filter of this.filters) {
+                if (isInputFilter(filter)) {
+                    inputValues[filter.value] = "";
+
+                    if (filter.default) {
+                        visibleInputKeys.push(filter.value);
+                    }
+
+                    continue;
+                }
+
+                if (isSelectFilter(filter)) {
+                    selectSelections[filter.value] = [];
+
+                    if (filter.default) {
+                        visibleSelectKeys.push(filter.value);
+                    }
+
+                    continue;
+                }
+
+                const defaultChoice = filter.options.find((choice) => choice.default)?.value;
+                optionSelections[filter.value] = defaultChoice ? [defaultChoice] : [];
+            }
+
+            this.inputValues = inputValues;
+            this.selectSelections = selectSelections;
+            this.optionSelections = optionSelections;
+            this.visibleInputKeys = visibleInputKeys;
+            this.visibleSelectKeys = visibleSelectKeys;
+            this.emitFilters();
         }
     }
 });

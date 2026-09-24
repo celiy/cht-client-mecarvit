@@ -8,7 +8,7 @@
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="flex flex-col gap-1">
                 <Select
-                    v-if="!isView"
+                    v-if="!isCoreReadonly"
 
                     id="clienteDocumento"
                     combobox
@@ -68,7 +68,7 @@
         </div>
 
         <Select
-            v-if="!isView"
+            v-if="!isCoreReadonly && !isOrcamentoMode && !restrictedEdit"
 
             id="responsaveisCpfs"
             label="Funcionário(s) responsáve(l/is)"
@@ -84,7 +84,7 @@
         />
 
         <div
-            v-else-if="isView && responsaveisViewItems.length > 0"
+            v-else-if="isView && !restrictedEdit && responsaveisViewItems.length > 0"
 
             class="flex flex-col gap-1.5"
         >
@@ -117,7 +117,7 @@
         <div class="grid gap-4 sm:grid-cols-2">
             <div class="flex flex-col gap-1">
                 <Select
-                    v-if="!isView"
+                    v-if="!isCoreReadonly"
 
                     id="veiculoId"
                     combobox
@@ -152,9 +152,9 @@
                 type="text"
                 label="Placa"
                 required
-                :variant="isView ? 'display' : 'secondary'"
-                :readonly="isView"
-                :disabled="!canEditVeiculoFields && !isView"
+                :variant="isCoreReadonly ? 'display' : 'secondary'"
+                :readonly="isCoreReadonly"
+                :disabled="!canEditVeiculoFields && !isCoreReadonly"
                 :value="formValues.veiculoPlaca"
                 :error="fieldError('veiculoPlaca')"
 
@@ -167,9 +167,9 @@
                 id="veiculoKilometragem"
                 type="number"
                 label="Quilometragem"
-                :variant="isView ? 'display' : 'secondary'"
-                :readonly="isView"
-                :disabled="!canEditVeiculoFields && !isView"
+                :variant="isCoreReadonly ? 'display' : 'secondary'"
+                :readonly="isCoreReadonly"
+                :disabled="!canEditVeiculoFields && !isCoreReadonly"
                 :value="formValues.veiculoKilometragem"
                 :error="fieldError('veiculoKilometragem')"
 
@@ -177,7 +177,7 @@
             />
 
             <Select
-                v-if="!isView"
+                v-if="!isCoreReadonly"
 
                 id="veiculoTipo"
                 combobox
@@ -208,12 +208,12 @@
         <Marker separator />
 
         <div
-            v-if="statusOptions.length > 0"
+            v-if="showStatusBlock"
 
             class="flex flex-col gap-1"
         >
             <Select
-                v-if="!isView"
+                v-if="!isCoreReadonly && showStatusField"
 
                 id="statusOsId"
                 label="Status"
@@ -226,7 +226,7 @@
             />
 
             <Input
-                v-else
+                v-else-if="showStatusField"
 
                 id="statusOsId"
                 type="text"
@@ -236,7 +236,11 @@
                 :value="statusLabel"
             />
 
-            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+            <div
+                v-if="!isOrcamentoMode && !restrictedEdit"
+
+                class="mt-3 grid gap-4 sm:grid-cols-2"
+            >
                 <Input
                     id="dataInicio"
                     type="date"
@@ -282,8 +286,8 @@
             id="diagnosticoCliente"
             type="textarea"
             label="Diagnóstico do cliente"
-            :variant="isView ? 'display' : 'secondary'"
-            :readonly="isView"
+            :variant="isCoreReadonly ? 'display' : 'secondary'"
+            :readonly="isCoreReadonly"
             :value="formValues.diagnosticoCliente"
             :error="fieldError('diagnosticoCliente')"
 
@@ -291,6 +295,8 @@
         />
 
         <Input
+            v-if="!isOrcamentoMode"
+
             id="diagnosticoMecanico"
             type="textarea"
             label="Diagnóstico do mecânico"
@@ -305,7 +311,7 @@
         <Marker separator />
 
         <OrdemServicoItensSection
-            :mode="mode"
+            :mode="itensMode"
             :items="formValues.itens"
             :servico-suggestions="servicoSuggestions"
 
@@ -314,35 +320,24 @@
         />
 
         <div class="rounded border border-dashed p-3">
-            <div class="grid gap-4 sm:grid-cols-3">
+            <div
+                class="grid gap-4"
+                :class="isOrcamentoMode || !canSeePagamentos ? 'sm:grid-cols-1' : 'sm:grid-cols-2'"
+            >
                 <Input
-                    id="totalPecas"
+                    id="totalGeral"
                     type="money"
-                    label="Total peças"
+                    label="Total geral"
                     variant="display"
                     readonly
-                    :value="totalsDisplay.pecas"
+                    :value="totalsDisplay.total"
                 />
 
-                <Input
-                    id="totalObra"
-                    type="money"
-                    label="Total mão de obra"
-                    variant="display"
-                    readonly
-                    :value="totalsDisplay.obra"
-                />
+                <div
+                    v-if="!isOrcamentoMode && canSeePagamentos"
 
-                <div class="flex flex-col gap-4">
-                    <Input
-                        id="totalGeral"
-                        type="money"
-                        label="Total geral"
-                        variant="display"
-                        readonly
-                        :value="totalsDisplay.total"
-                    />
-
+                    class="flex flex-col gap-4"
+                >
                     <Input
                         id="totalPago"
                         type="money"
@@ -380,7 +375,7 @@
         />
 
         <CriadoModificadoFields
-            v-if="isView"
+            v-if="isView || restrictedEdit"
 
             id-prefix="os"
             :criado-em="formValues.criadoEm"
@@ -551,6 +546,31 @@ export default defineComponent({
             default: "create"
         },
 
+        orcamento: {
+            type: Boolean,
+            default: false
+        },
+
+        restrictedEdit: {
+            type: Boolean,
+            default: false
+        },
+
+        canSeeClientePii: {
+            type: Boolean,
+            default: true
+        },
+
+        canSeePagamentos: {
+            type: Boolean,
+            default: true
+        },
+
+        canEditItens: {
+            type: Boolean,
+            default: true
+        },
+
         values: {
             type: Object as PropType<OrdemServicoFormValues>,
             required: true
@@ -610,6 +630,30 @@ export default defineComponent({
     computed: {
         isView(): boolean {
             return this.mode === "view";
+        },
+
+        isCoreReadonly(): boolean {
+            return this.isView || this.restrictedEdit;
+        },
+
+        itensMode(): DialogMode {
+            if (this.isView || !this.canEditItens) {
+                return "view";
+            }
+
+            return this.mode;
+        },
+
+        isOrcamentoMode(): boolean {
+            return this.formValues.statusOsId === "6" || (this.mode === "create" && this.orcamento);
+        },
+
+        showStatusField(): boolean {
+            return this.mode !== "create";
+        },
+
+        showStatusBlock(): boolean {
+            return this.statusOptions.length > 0 && (this.showStatusField || !this.isOrcamentoMode);
         },
 
         clienteSearch() {
@@ -692,7 +736,7 @@ export default defineComponent({
         },
 
         showClienteCpfField(): boolean {
-            if (this.isView) {
+            if (this.isCoreReadonly || !this.canSeeClientePii) {
                 return false;
             }
 
@@ -703,7 +747,11 @@ export default defineComponent({
         },
 
         showClienteCelField(): boolean {
-            if (this.isView) {
+            if (!this.canSeeClientePii) {
+                return false;
+            }
+
+            if (this.isCoreReadonly) {
                 return Boolean(ordemServicoFieldText(this.formValues, "clienteCel"));
             }
 
@@ -778,25 +826,18 @@ export default defineComponent({
             return found?.label || this.formValues.statusOsId || "—";
         },
 
-        totalsDisplay(): { pecas: string; obra: string; total: string } {
-            let pecas = 0;
-            let obra = 0;
+        totalsDisplay(): { total: string } {
+            let total = 0;
 
             for (const item of this.formValues.itens ?? []) {
                 const qty = Number(item.quantidade);
                 const quantidade = Number.isFinite(qty) && qty > 0 ? qty : 0;
-                const valorPecas = parseMoneyInput(item.valorPecas) ?? 0;
-                const valorObra = parseMoneyInput(item.valorObra) ?? 0;
+                const valor = parseMoneyInput(item.valor) ?? 0;
 
-                pecas += quantidade * valorPecas;
-                obra += quantidade * valorObra;
+                total += quantidade * valor;
             }
 
-            const total = pecas + obra;
-
             return {
-                pecas: moneyAmountToInputDigits(pecas),
-                obra: moneyAmountToInputDigits(obra),
                 total: moneyAmountToInputDigits(total)
             };
         },

@@ -1,9 +1,24 @@
 <template>
     <main class="container-center container p-8">
         <div class="flex items-center justify-between">
-            <h2 class="text-2xl font-semibold">
-                {{ title }}
-            </h2>
+            <div class="flex items-center gap-2">
+                <h2 class="text-2xl font-semibold">
+                    {{ title }}
+                </h2>
+
+                <Button
+                    v-if="showExport"
+
+                    v-tooltip="'Exportar tabela para PDF'"
+                    class="p-2.5"
+                    aria-label="Exportar tabela para PDF"
+                    :disabled="exporting"
+
+                    @click="$emit('export')"
+                >
+                    <span class="fa-solid fa-file-pdf text-xs" />
+                </Button>
+            </div>
 
             <div>
                 <slot name="headerActions">
@@ -129,6 +144,16 @@ export default defineComponent({
             default: true
         },
 
+        showExport: {
+            type: Boolean,
+            default: false
+        },
+
+        exporting: {
+            type: Boolean,
+            default: false
+        },
+
         showFilters: {
             type: Boolean,
             default: true
@@ -203,7 +228,8 @@ export default defineComponent({
         "page",
         "action",
         "delete",
-        "search:external"
+        "search:external",
+        "export"
     ],
 
     data() {
@@ -229,7 +255,7 @@ export default defineComponent({
         "$route.query.cadastrar": {
             immediate: true,
             handler(value: unknown) {
-                if (!isCadastrarQuery(value)) {
+                if (!isCadastrarQuery(value) || !this.showCreate) {
                     return;
                 }
 

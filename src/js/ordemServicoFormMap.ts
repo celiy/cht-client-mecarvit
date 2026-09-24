@@ -9,8 +9,7 @@ export interface OrdemServicoItemApi {
     servicoId: number;
     servicoNome?: string;
     quantidade: number;
-    valorObra: number;
-    valorPecas?: number | null;
+    valor: number;
 }
 
 export interface OrdemServicoApi {
@@ -18,7 +17,10 @@ export interface OrdemServicoApi {
     criadoEm?: string;
     modificadoEm?: string;
     clienteDocumento: string;
+    clienteNome?: string | null;
     veiculoId: number;
+    veiculo?: VeiculoOsFormLookup | null;
+    cliente?: ClienteOsFormLookup | null;
     diagnosticoCliente?: string | null;
     diagnosticoMecanico?: string | null;
     dataInicio?: string | null;
@@ -37,6 +39,7 @@ export interface OrdemServicoApi {
     }>;
     responsaveis?: string[];
     total?: number;
+    pagamentoSituacao?: string;
     registroEntradaSaida?: {
         valor: number;
         dataLimitePagamento?: string | null;
@@ -76,11 +79,7 @@ function mapItensFromApi(itens: OrdemServicoItemApi[] | undefined): OrdemServico
         servicoId: item.servicoId,
         servicoNome: item.servicoNome ?? "",
         quantidade: String(item.quantidade),
-        valorObra: moneyAmountToInputDigits(item.valorObra),
-        valorPecas:
-            item.valorPecas != null && item.valorPecas !== 0
-                ? moneyAmountToInputDigits(item.valorPecas)
-                : ""
+        valor: moneyAmountToInputDigits(item.valor)
     }));
 }
 
@@ -92,17 +91,18 @@ export function toOsForm(
     return {
         id: os.id,
         clienteDocumento: os.clienteDocumento ?? "",
-        clienteNome: cliente?.nome ?? "",
+        clienteNome: cliente?.nome ?? os.cliente?.nome ?? os.clienteNome ?? "",
         clienteCpfNovo: "",
-        clienteCel: cliente?.cel ?? "",
+        clienteCel: cliente?.cel ?? os.cliente?.cel ?? "",
         veiculoId: os.veiculoId != null ? String(os.veiculoId) : "",
-        veiculoModelo: veiculo?.modelo ?? "",
-        veiculoPlaca: veiculo?.placa ?? "",
+        veiculoModelo: veiculo?.modelo ?? os.veiculo?.modelo ?? "",
+        veiculoPlaca: veiculo?.placa ?? os.veiculo?.placa ?? "",
         veiculoKilometragem:
-            veiculo?.kilometragem != null && veiculo.kilometragem !== 0
-                ? String(veiculo.kilometragem)
+            (veiculo?.kilometragem ?? os.veiculo?.kilometragem) != null &&
+            (veiculo?.kilometragem ?? os.veiculo?.kilometragem) !== 0
+                ? String(veiculo?.kilometragem ?? os.veiculo?.kilometragem)
                 : "",
-        veiculoTipo: veiculo?.tipo ?? "",
+        veiculoTipo: veiculo?.tipo ?? os.veiculo?.tipo ?? "",
         statusOsId: os.statusOsId != null ? String(os.statusOsId) : "1",
         dataInicio: formatDateInputValue(os.dataInicio),
         dataConclusao: formatDateInputValue(os.dataConclusao),

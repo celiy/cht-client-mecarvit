@@ -115,7 +115,8 @@
 
                 <Select
                     id="pagamento-tipo"
-                    header="Tipo"
+                    label="Tipo"
+                    placeholder="Selecione o tipo"
                     :options="PAGAMENTO_SELECT_OPTIONS"
                     :model-value="tipo"
 
@@ -364,6 +365,22 @@ export default defineComponent({
                 this.$toast.error("Informe o tipo e um valor maior que zero.");
 
                 return;
+            }
+
+            if (Number.isFinite(this.valorTotal)) {
+                const currentSum = this.localRows.reduce((sum, row, index) => {
+                    if (index === this.editingIndex) {
+                        return sum;
+                    }
+
+                    return sum + (parseStoredMoneyAmount(row.valor) ?? 0);
+                }, 0);
+
+                if (currentSum + valorNum > Number(this.valorTotal) + 0.009) {
+                    this.$toast.error("A soma dos pagamentos não pode ser maior que o valor do lançamento.");
+
+                    return;
+                }
             }
 
             const entry: PagamentoFormRow = {

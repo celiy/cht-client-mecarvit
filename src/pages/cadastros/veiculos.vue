@@ -6,11 +6,15 @@
         :loading="loadingVeiculos"
         :headers="tableHeaders"
         :rows="tableRows"
+        :actions="rowActions"
         :page-count="pageCount"
         pagination-id="pagination-veiculos"
         :pagination-key="filters || 'all'"
         delete-name-field="modelo"
         :filter-select-options="filterSelectOptions"
+        :show-create="canCreate"
+        :show-export="canExport"
+        :exporting="exporting"
         empty-title="Nenhum veículo encontrado."
         empty-description="Ajuste os filtros ou cadastre um novo veículo."
 
@@ -22,6 +26,7 @@
         @action="onRowAction"
         @delete="onDelete"
         @search:external="onFilterSearch"
+        @export="onExport"
     >
         <ItemViewEdit
             ref="itemDialog"
@@ -54,7 +59,9 @@ import {
     veiculoOptionalFields
 } from "../../js/entityFields";
 import {
+    CRUD_ROW_ACTIONS,
     documentDigits,
+    fetchAllList,
     listQuery,
     notifyHttpError,
     pageCountFromTotal,
@@ -64,6 +71,8 @@ import {
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
+import { currentCanCreate, currentCanDelete, currentCanExport } from "../../js/mecarvit";
+import { downloadTablePdf } from "../../js/exportTablePdf";
 
 interface ClienteApi {
     documento: string;
@@ -155,11 +164,27 @@ export default defineComponent({
             clienteSearchSeq: 0,
             page: 1,
             pageLimit: 10,
-            pageCount: 0
+            pageCount: 0,
+            exporting: false
         };
     },
 
     computed: {
+        canCreate(): boolean {
+            return currentCanCreate("veiculos");
+        },
+
+        canExport(): boolean {
+            return currentCanExport("veiculos");
+        },
+
+        rowActions() {
+            if (currentCanDelete("veiculos")) {
+                return CRUD_ROW_ACTIONS;
+            }
+
+            return CRUD_ROW_ACTIONS.filter((action) => action.value !== "delete" && !action.separator);
+        },
         veiculoFilters(): FilterDef[] {
             return [
                 {
@@ -388,6 +413,30 @@ export default defineComponent({
                 this.pageCount = 0;
             } finally {
                 this.loadingVeiculos = false;
+            }
+        },
+
+        async onExport() {
+            this.exporting = true;
+
+            try {
+                const rows = await fetchAllList<VeiculoApi>(
+                    this.$http.get.bind(this.$http),
+                    "/api/veiculo",
+                    this.filters
+                );
+                const mapped = rows.map((veiculo) => ({
+                    ...veiculo,
+                    clienteNome:
+                        veiculo.cliente?.nome
+                        || this.clienteNameByDocumento[veiculo.clienteDocumento]
+                        || veiculo.clienteDocumento
+                }));
+                downloadTablePdf("Veículos", this.tableHeaders, mapped);
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível exportar a tabela.");
+            } finally {
+                this.exporting = false;
             }
         },
 

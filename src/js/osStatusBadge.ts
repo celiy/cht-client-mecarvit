@@ -1,3 +1,4 @@
+import { PAGAMENTO_SITUACAO, type PagamentoSituacao } from "@shared/mecarvit/pagamentoSituacao";
 import { formatTableLabel } from "./formatTableLabel";
 
 export type OsStatusBadge = {
@@ -17,7 +18,8 @@ const COLOR_BY_STATUS_ID: Record<number, string> = {
     2: "warning",
     3: "blue-500",
     4: "success",
-    5: "destructive"
+    5: "destructive",
+    6: "slate-500"
 };
 
 const DEFAULT_COLOR = "slate-500";
@@ -56,6 +58,42 @@ export function osStatusBadge(statusOsId: number, nome: string): OsStatusBadge {
         badge: {
             label: formatTableLabel(nome),
             color
+        }
+    };
+}
+
+const PAGAMENTO_BADGE: Record<
+    PagamentoSituacao,
+    { variant?: "success" | "warning" | "destructive"; color?: string }
+> = {
+    [PAGAMENTO_SITUACAO.PAGO]: { variant: "success" },
+    [PAGAMENTO_SITUACAO.A_VENCER]: { variant: "warning" },
+    [PAGAMENTO_SITUACAO.NAO_PAGO]: { color: "orange-600" },
+    [PAGAMENTO_SITUACAO.ATRASADO]: { variant: "destructive" }
+};
+
+export function osPagamentoBadge(
+    situacao: string | undefined,
+    dataLimiteLabel: string
+): {
+    badge: {
+        label: string;
+        variant?: "success" | "warning" | "destructive";
+        color?: string;
+        tooltip?: string;
+    };
+} {
+    const key = (situacao || PAGAMENTO_SITUACAO.NAO_PAGO) as PagamentoSituacao;
+    const style = PAGAMENTO_BADGE[key] ?? PAGAMENTO_BADGE[PAGAMENTO_SITUACAO.NAO_PAGO];
+
+    return {
+        badge: {
+            label: key,
+            ...style,
+            tooltip:
+                dataLimiteLabel && dataLimiteLabel !== "—"
+                    ? `Data de pagamento: ${dataLimiteLabel}`
+                    : undefined
         }
     };
 }

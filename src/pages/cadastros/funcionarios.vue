@@ -7,10 +7,14 @@
         :loading="loadingFuncionarios"
         :headers="tableHeaders"
         :rows="tableRows"
+        :actions="rowActions"
         :page-count="pageCount"
         pagination-id="pagination-funcionarios"
         :pagination-key="filters || 'all'"
         delete-name-field="nome"
+        :show-create="canCreate"
+        :show-export="canExport"
+        :exporting="exporting"
         empty-title="Nenhum funcionário encontrado."
         empty-description="Ajuste os filtros ou cadastre um novo funcionário."
 
@@ -21,6 +25,7 @@
         @page="onPage"
         @action="onRowAction"
         @delete="onDelete"
+        @export="onExport"
     >
         <ItemViewEdit
             ref="itemDialog"
@@ -57,7 +62,7 @@
             </template>
 
             <template
-                v-if="dialogMode !== 'view' && !dialogUsuarioSuperadmin"
+                v-if="dialogMode === 'edit' && !dialogUsuarioSuperadmin && canResetPassword"
                 #formActions
             >
                 <Button
@@ -116,7 +121,9 @@ import Button from "@design/components/Button.vue";
 import ConfirmationModal from "@design/components/custom/ConfirmationModal.vue";
 import {
     ATIVO_FILTER_OPTIONS,
+    CRUD_ROW_ACTIONS,
     documentDigits,
+    fetchAllList,
     listQuery,
     notifyHttpError,
     pageCountFromTotal,
@@ -127,10 +134,23 @@ import {
     type ListResponse
 } from "../../js/crudHttp";
 import {
+    currentCanCreate,
+    currentCanDelete,
+    currentCanExport,
+    currentCanSeePii,
+    currentIsSuperadmin,
     excludeCurrentUsuario,
     excludeSuperadminCargos,
     isUsuarioSuperadmin
 } from "../../js/mecarvit";
+import { downloadTablePdf } from "../../js/exportTablePdf";
+import {
+    ACCESS_AREAS,
+    ACCESS_LEVELS,
+    keysFromAreaLevels,
+    type AccessAreaKey,
+    type AccessLevelKey
+} from "@shared/mecarvit/access";
 
 interface UsuarioApi {
     cpf: string;
@@ -165,13 +185,23 @@ interface FuncionarioFormValues {
 
 interface CargoFormValues {
     nome: string;
-    nivelAcesso: string[];
+    funcionarios: AccessLevelKey;
+    clientes: AccessLevelKey;
+    veiculos: AccessLevelKey;
+    os: AccessLevelKey;
+    financeiro: AccessLevelKey;
+    gerente: boolean;
 }
 
 function emptyCargoForm(): CargoFormValues {
     return {
         nome: "",
-        nivelAcesso: []
+        funcionarios: "none",
+        clientes: "none",
+        veiculos: "none",
+        os: "none",
+        financeiro: "none",
+        gerente: false
     };
 }
 
@@ -223,7 +253,7 @@ export default defineComponent({
                 },
                 { type: "input", value: "cpf", label: "CPF" }
             ] as FilterDef[],
-            tableHeaders: [
+            tableHeadersBase: [
                 { label: "Nome", field: "nome", position: "start" },
                 { label: "Cargo", field: "cargoNome", position: "start" },
                 { label: "CPF", field: "cpf", position: "start" }
@@ -247,11 +277,43 @@ export default defineComponent({
             pageCount: 0,
             dialogUsuarioSuperadmin: false,
             senhaResetTriggered: false,
-            resetConfirmOpen: false
+            resetConfirmOpen: false,
+            exporting: false
         };
     },
 
     computed: {
+        canCreate(): boolean {
+            return currentCanCreate("funcionarios");
+        },
+
+        canExport(): boolean {
+            return currentCanExport("funcionarios");
+        },
+
+        canSeePii(): boolean {
+            return currentCanSeePii("funcionarios");
+        },
+
+        canResetPassword(): boolean {
+            return currentIsSuperadmin();
+        },
+
+        tableHeaders(): TableHeader[] {
+            if (this.canSeePii) {
+                return this.tableHeadersBase;
+            }
+
+            return this.tableHeadersBase.filter((header) => header.field !== "cpf");
+        },
+
+        rowActions() {
+            if (currentCanDelete("funcionarios")) {
+                return CRUD_ROW_ACTIONS;
+            }
+
+            return CRUD_ROW_ACTIONS.filter((action) => action.value !== "delete" && !action.separator);
+        },
         tableRows() {
             return this.funcionarios as unknown as Array<Record<string, unknown>>;
         },
@@ -285,15 +347,18 @@ export default defineComponent({
                     label: "Email",
                     type: "email",
                     required: true
-                },
-                {
+                }
+            ];
+
+            if (isCreate || this.canSeePii) {
+                fields.push({
                     id: "cpf",
                     label: "CPF",
                     type: "cpf",
                     required: true,
                     readonly: !isCreate
-                }
-            ];
+                });
+            }
 
             if (isCreate) {
                 fields.push({
@@ -360,6 +425,19 @@ export default defineComponent({
         },
 
         cargoFields(): FormField[] {
+            const levelOptions = ACCESS_LEVELS.map((level) => ({
+                label: level.label,
+                value: level.key
+            }));
+
+            const areaFields: FormField[] = ACCESS_AREAS.map((area) => ({
+                id: area.key,
+                label: area.label,
+                placeholder: "Nível de acesso",
+                type: "select",
+                options: levelOptions
+            }));
+
             return [
                 {
                     id: "nome",
@@ -367,21 +445,14 @@ export default defineComponent({
                     type: "text",
                     required: true
                 },
+                ...areaFields,
                 {
-                    id: "nivelAcesso",
-                    label: "Nível de acesso",
-                    type: "select",
-                    required: true,
-                    helperText: "Selecione um ou mais módulos",
-                    selectMultiple: { min: 1 },
-                    options: [
-                        { label: "Ponto", value: "1" },
-                        { label: "Clientes", value: "2" },
-                        { label: "Veículos", value: "3" },
-                        { label: "Ordens de serviço", value: "4" },
-                        { label: "Funcionários", value: "5" },
-                        { label: "Terminal", value: "6" }
-                    ]
+                    id: "gerente",
+                    label: "Cargo de gerente",
+                    type: "checkbox",
+                    checkboxStyle: "switch",
+                    description:
+                        "Permite ver e editar dados sensíveis como CPF e CNPJ nas áreas com acesso."
                 }
             ];
         }
@@ -526,6 +597,23 @@ export default defineComponent({
             }
         },
 
+        async onExport() {
+            this.exporting = true;
+
+            try {
+                const rows = await fetchAllList<UsuarioApi>(this.$http.get.bind(this.$http), "/api/usuario", this.filters);
+                downloadTablePdf(
+                    "Funcionários",
+                    this.tableHeaders,
+                    excludeCurrentUsuario(rows) as unknown as Array<Record<string, unknown>>
+                );
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível exportar a tabela.");
+            } finally {
+                this.exporting = false;
+            }
+        },
+
         openDialog(
             mode: DialogMode,
             item: FuncionarioFormValues,
@@ -656,16 +744,17 @@ export default defineComponent({
             void this.getCargos(payload.value, payload.field || "nome");
         },
 
-        nivelAcessoFromPayload(value: unknown): string {
-            if (Array.isArray(value)) {
-                return value
-                    .map((item) => String(item))
-                    .filter((item) => item !== "")
-                    .sort()
-                    .join("");
+        nivelAcessoFromPayload(payload: Record<string, unknown>): string[] {
+            const levels = {} as Record<AccessAreaKey, AccessLevelKey>;
+
+            for (const area of ACCESS_AREAS) {
+                const raw = String(payload[area.key] ?? "none");
+                levels[area.key] = ACCESS_LEVELS.some((level) => level.key === raw)
+                    ? (raw as AccessLevelKey)
+                    : "none";
             }
 
-            return String(value ?? "");
+            return keysFromAreaLevels(levels, Boolean(payload.gerente));
         },
 
         async onSaveCargo(payload: Record<string, unknown>) {
@@ -674,7 +763,7 @@ export default defineComponent({
             try {
                 const response = await this.$http.post<ItemResponse<CargoApi>>("/api/cargo", {
                     nome: payload.nome,
-                    nivelAcesso: this.nivelAcessoFromPayload(payload.nivelAcesso)
+                    nivelAcesso: this.nivelAcessoFromPayload(payload)
                 });
                 const created = response.data.data;
 
