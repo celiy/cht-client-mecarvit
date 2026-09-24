@@ -56,6 +56,16 @@
                             />
 
                             <Option
+                                v-if="isSuperadmin"
+
+                                label="Logs do sistema"
+                                value="audit-logs"
+                                icon="fa-clipboard-list"
+
+                                @click="goToAuditLogs"
+                            />
+
+                            <Option
                                 label="Mudar tema"
                                 value="theme"
                                 :icon="themeIcon"
@@ -94,7 +104,7 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 import { clearAuthToken } from "@base/http";
 import { project } from "@base/project";
-import { clearMecarvitSession, mecarvit } from "../js/mecarvit";
+import { clearMecarvitSession, currentIsSuperadmin, mecarvit } from "../js/mecarvit";
 import { sidebarNavItems } from "../js/sidebarNav";
 import Button from "@design/components/Button.vue";
 import AppUpdateButton from "@base/components/AppUpdateButton.vue";
@@ -102,6 +112,7 @@ import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 const router = useRouter();
 
 const navItems = computed(() => sidebarNavItems(mecarvit.user?.nivelAcesso));
+const isSuperadmin = computed(() => currentIsSuperadmin());
 
 const themeIcon = computed(() => {
     return project.style.activeTheme === "dark" ? "fa-sun" : "fa-moon";
@@ -109,6 +120,10 @@ const themeIcon = computed(() => {
 
 function goToProfile() {
     void router.push({ name: "usuario" });
+}
+
+function goToAuditLogs() {
+    void router.push({ name: "audit-logs" });
 }
 
 function toggleTheme() {

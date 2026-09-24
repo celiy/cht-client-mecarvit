@@ -21,15 +21,16 @@
                     v-for="filter in visibleInputFilters"
                     :key="'div-input-' + filter.value"
 
-                    class="h-fit"
+                    class="h-fit w-48 shrink-0"
                 >
                     <Input
                         :id="`filter-${filter.value}`"
                         :key="filter.value"
 
-                        class="max-w-xs min-w-48"
+                        class="w-full"
                         :type="inputTypeFor(filter)"
                         :placeholder="filter.label"
+                        :helper-text="helperTextFor(filter)"
                         :model-value="inputValues[filter.value] ?? ''"
 
                         @update:model-value="onInputValue(filter.value, $event)"
@@ -40,7 +41,7 @@
                     v-for="filter in visibleSelectFilters"
                     :key="'div-select-' + filter.value"
 
-                    class="h-fit max-w-sm min-w-56"
+                    class="h-fit w-48 shrink-0"
                 >
                     <Select
                         :id="`filter-${filter.value}`"
@@ -129,6 +130,7 @@ export type FilterInputDef = {
     label: string;
     default?: boolean;
     inputType?: FilterInputType;
+    helperText?: string;
 };
 
 export type FilterOptionDef = {
@@ -390,6 +392,18 @@ export default defineComponent({
             }
 
             return "text";
+        },
+
+        helperTextFor(filter: FilterInputDef): string {
+            if (filter.helperText) {
+                return filter.helperText;
+            }
+
+            if (this.inputTypeFor(filter) === "date") {
+                return "Filtrar por esta data";
+            }
+
+            return "";
         },
 
         serializedInputValue(filter: FilterInputDef): string {

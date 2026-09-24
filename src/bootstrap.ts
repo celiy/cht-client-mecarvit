@@ -9,7 +9,8 @@ import {
     loadCurrentUser,
     mecarvitPlugin,
     mecarvit,
-    isUsuarioSuperadmin
+    isUsuarioSuperadmin,
+    currentIsSuperadmin
 } from "./js/mecarvit";
 
 export function isAuthenticated(): boolean {
@@ -28,6 +29,10 @@ export function setupAuthGuard(router: Router): void {
         }
 
         if (to.meta.guestOnly && authenticated) {
+            return { name: "home" };
+        }
+
+        if (to.meta.requiresSuperadmin && !currentIsSuperadmin()) {
             return { name: "home" };
         }
 

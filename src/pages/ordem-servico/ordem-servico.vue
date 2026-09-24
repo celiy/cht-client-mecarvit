@@ -477,20 +477,23 @@ export default defineComponent({
                 },
                 {
                     type: "option",
-                    value: "paga",
-                    label: "Paga",
+                    value: "pagamentoSituacao",
+                    label: "Status pagamento",
                     options: [
-                        { label: "Todas", value: "todas", default: true },
-                        { label: "Sim", value: "sim" },
-                        { label: "Não", value: "nao" }
+                        { label: "Todos", value: "todos", default: true },
+                        { label: "Pago", value: "pago" },
+                        { label: "Não pago", value: "nao_pago" },
+                        { label: "A vencer", value: "a_vencer" },
+                        { label: "Atrasado", value: "atrasado" }
                     ]
                 },
                 ...(this.canSeePagamentos
                     ? [{
                         type: "input" as const,
                         value: "dataLimitePagamento",
-                        label: "Data limite",
-                        inputType: "date" as const
+                        label: "Data pagamento",
+                        inputType: "date" as const,
+                        helperText: "Filtrar pela data de pagamento"
                     }]
                     : [])
             ];
@@ -656,8 +659,8 @@ export default defineComponent({
                 delete queryValues.statusOsId;
             }
 
-            if (queryValues.paga === "todas") {
-                delete queryValues.paga;
+            if (queryValues.pagamentoSituacao === "todos") {
+                delete queryValues.pagamentoSituacao;
             }
 
             this.filters = toQueryString(queryValues);

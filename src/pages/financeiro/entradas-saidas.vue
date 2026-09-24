@@ -19,7 +19,23 @@
                 class="mt-2 mb-4 scroll-mt-24 border-t border-b pt-2 pb-4"
             >
                 <div class="mb-4">
-                    <h3 class="mb-1!">Entradas</h3>
+                    <div class="mb-1 flex items-center gap-2">
+                        <h3 class="mb-0!">Entradas</h3>
+
+                        <Button
+                            v-if="canExport"
+
+                            v-tooltip="'Exportar entradas para PDF'"
+                            class="p-2.5"
+                            aria-label="Exportar entradas para PDF"
+                            :disabled="exportingEntradas || exportingSaidas"
+
+                            @click="onExportSection('entrada')"
+                        >
+                            <span class="fa-solid fa-file-pdf text-xs" />
+                        </Button>
+                    </div>
+
                     <p class="text-muted-foreground! sm:w-1/2">
                         Entradas correspondem a todos os valores recebidos pela empresa, seja por
                         vendas, serviços ou outros recebimentos.
@@ -73,7 +89,23 @@
                 class="mt-10 scroll-mt-24"
             >
                 <div class="mb-4">
-                    <h3 class="mb-1!">Saídas</h3>
+                    <div class="mb-1 flex items-center gap-2">
+                        <h3 class="mb-0!">Saídas</h3>
+
+                        <Button
+                            v-if="canExport"
+
+                            v-tooltip="'Exportar saídas para PDF'"
+                            class="p-2.5"
+                            aria-label="Exportar saídas para PDF"
+                            :disabled="exportingEntradas || exportingSaidas"
+
+                            @click="onExportSection('saida')"
+                        >
+                            <span class="fa-solid fa-file-pdf text-xs" />
+                        </Button>
+                    </div>
+
                     <p class="text-muted-foreground! sm:w-1/2">
                         Saídas são todos os valores pagos pela empresa, como custos, despesas e
                         outros pagamentos.
@@ -528,7 +560,9 @@ export default defineComponent({
                 valorTotal: number;
             } | null,
             scrollFrame: null as number | null,
-            exporting: false
+            exporting: false,
+            exportingEntradas: false,
+            exportingSaidas: false
         };
     },
 
@@ -560,12 +594,14 @@ export default defineComponent({
         pagoFilterDef(): FilterDef {
             return {
                 type: "option",
-                value: "pago",
-                label: "Pago",
+                value: "pagamentoSituacao",
+                label: "Status pagamento",
                 options: [
                     { label: "Todos", value: "todos", default: true },
-                    { label: "Sim", value: "sim" },
-                    { label: "Não", value: "nao" }
+                    { label: "Pago", value: "pago" },
+                    { label: "Não pago", value: "nao_pago" },
+                    { label: "A vencer", value: "a_vencer" },
+                    { label: "Atrasado", value: "atrasado" }
                 ]
             };
         },
@@ -574,8 +610,9 @@ export default defineComponent({
             return {
                 type: "input",
                 value: "dataLimitePagamento",
-                label: "Data limite",
-                inputType: "date"
+                label: "Data pagamento",
+                inputType: "date",
+                helperText: "Filtrar pela data de pagamento"
             };
         },
 
@@ -1129,8 +1166,8 @@ export default defineComponent({
         registroFiltersQuery(values: FilterValues): string {
             const queryValues = { ...values };
 
-            if (queryValues.pago === "todos") {
-                delete queryValues.pago;
+            if (queryValues.pagamentoSituacao === "todos") {
+                delete queryValues.pagamentoSituacao;
             }
 
             return toQueryString(queryValues);
@@ -1179,20 +1216,8 @@ export default defineComponent({
 
             try {
                 const [entradas, saidas] = await Promise.all([
-                    fetchAllList<RegistroApi>(
-                        this.$http.get.bind(this.$http),
-                        "/api/regentradasaida",
-                        [this.entradaFilters, toQueryString({ tipo: "entrada" })]
-                            .filter(Boolean)
-                            .join("&")
-                    ),
-                    fetchAllList<RegistroApi>(
-                        this.$http.get.bind(this.$http),
-                        "/api/regentradasaida",
-                        [this.saidaFilters, toQueryString({ tipo: "saida" })]
-                            .filter(Boolean)
-                            .join("&")
-                    )
+                    this.fetchExportRows("entrada"),
+                    this.fetchExportRows("saida")
                 ]);
 
                 downloadTablesPdf("Entradas e saídas", [
@@ -1212,6 +1237,52 @@ export default defineComponent({
             } finally {
                 this.exporting = false;
             }
+        },
+
+        async onExportSection(tipo: "entrada" | "saida") {
+            const isEntrada = tipo === "entrada";
+
+            if (isEntrada) {
+                this.exportingEntradas = true;
+            } else {
+                this.exportingSaidas = true;
+            }
+
+            try {
+                const rows = await this.fetchExportRows(tipo);
+
+                downloadTablesPdf(isEntrada ? "Entradas" : "Saídas", [
+                    {
+                        title: isEntrada ? "Entradas" : "Saídas",
+                        headers: this.tableHeaders,
+                        rows: rows.map((row) => this.toTableRow(row))
+                    }
+                ]);
+            } catch (error) {
+                notifyHttpError(
+                    this.$toast,
+                    error,
+                    isEntrada
+                        ? "Não foi possível exportar as entradas."
+                        : "Não foi possível exportar as saídas."
+                );
+            } finally {
+                if (isEntrada) {
+                    this.exportingEntradas = false;
+                } else {
+                    this.exportingSaidas = false;
+                }
+            }
+        },
+
+        async fetchExportRows(tipo: "entrada" | "saida"): Promise<RegistroApi[]> {
+            const filters = tipo === "entrada" ? this.entradaFilters : this.saidaFilters;
+
+            return fetchAllList<RegistroApi>(
+                this.$http.get.bind(this.$http),
+                "/api/regentradasaida",
+                [filters, toQueryString({ tipo })].filter(Boolean).join("&")
+            );
         },
 
         async getRegistros(tipo: "entrada" | "saida") {

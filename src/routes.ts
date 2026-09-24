@@ -52,6 +52,12 @@ const routes: RouteRecordRaw[] = [
             { path: "", name: "index", redirect: "/home" },
             { path: "home", name: "home", component: HomePage },
             { path: "usuario", name: "usuario", component: UsuarioPage },
+            {
+                path: "logs",
+                name: "audit-logs",
+                component: () => import("./pages/logs.vue"),
+                meta: { requiresSuperadmin: true }
+            },
             { path: "funcionarios", name: "funcionarios", component: FuncionariosPage },
             { path: "clientes", name: "clientes", component: ClientesPage },
             { path: "veiculos", name: "veiculos", component: VeiculosPage },
