@@ -82,8 +82,7 @@
             :is-open="resetConfirmOpen"
             variant="warning"
             title="Resetar senha"
-            description="O funcionário precisará trocar a senha no próximo acesso."
-            body="Defina uma nova senha para o funcionário. Esta ação não pode ser desfeita."
+            description="O funcionário precisará trocar a senha no próximo acesso. Defina uma nova senha para o funcionário. Esta ação não pode ser desfeita."
             confirm-text="Resetar"
             cancel-text="Cancelar"
 
@@ -133,6 +132,7 @@ import {
     withSelectedItem,
     type DialogMode,
     type ItemResponse,
+    type CrudListPageExpose,
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
@@ -638,6 +638,10 @@ export default defineComponent({
             return this.$refs.cargoDialog as ItemViewEditExpose | undefined;
         },
 
+        listPage(): CrudListPageExpose | undefined {
+            return this.$refs.listPage as CrudListPageExpose | undefined;
+        },
+
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
@@ -645,7 +649,7 @@ export default defineComponent({
             this.senhaResetTriggered = false;
             this.resetConfirmOpen = false;
             this.closeCargoDialog();
-            void this.$refs.listPage?.clearCadastrarQuery?.();
+            void this.listPage()?.clearCadastrarQuery?.();
         },
 
         onDialogModeChange(mode: DialogMode) {

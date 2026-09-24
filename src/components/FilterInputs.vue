@@ -542,7 +542,11 @@ export default defineComponent({
 
             const filter = this.filters.find((entry) => entry.value === value);
 
-            if (!filter || filter.default) {
+            if (!filter) {
+                return;
+            }
+
+            if ((isInputFilter(filter) || isSelectFilter(filter)) && filter.default) {
                 return;
             }
 

@@ -1,7 +1,9 @@
 <template>
     <ElectronStartupGate>
-        <RouterView />
-        <DevToolsExample />
+        <SystemOwnerGate>
+            <RouterView />
+            <DevToolsExample />
+        </SystemOwnerGate>
     </ElectronStartupGate>
 </template>
 
@@ -9,13 +11,15 @@
 import { defineComponent } from "vue";
 import ElectronStartupGate from "@base/electron/ElectronStartupGate.vue";
 import DevToolsExample from "./components/DevToolsExample.vue";
+import SystemOwnerGate from "./components/SystemOwnerGate.vue";
 
 export default defineComponent({
     name: "MecarvitApp",
 
     components: {
         ElectronStartupGate,
-        DevToolsExample
+        DevToolsExample,
+        SystemOwnerGate
     }
 });
 </script>

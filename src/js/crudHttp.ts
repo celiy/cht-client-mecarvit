@@ -15,11 +15,19 @@ export type ItemResponse<T> = {
 
 export type DialogMode = "view" | "edit" | "create";
 
-export type ItemViewEditExpose = {
+export type HttpFieldErrorsExpose = {
     applyFieldErrors: (errors: Record<string, string>) => void;
+};
+
+export type ItemViewEditExpose = HttpFieldErrorsExpose & {
     setFieldValue: (fieldId: string, value: unknown) => void;
     getFieldValue: (fieldId: string) => unknown;
     closeSelect: (fieldId: string) => void;
+};
+
+export type CrudListPageExpose = {
+    clearCadastrarQuery?: () => void | Promise<void>;
+    requestDelete?: (item: Record<string, unknown>) => void;
 };
 
 export type ToastLike = {
@@ -66,7 +74,7 @@ export function notifyHttpError(
     toast: ToastLike,
     error: unknown,
     fallback: string,
-    dialog?: ItemViewEditExpose
+    dialog?: HttpFieldErrorsExpose
 ): void {
     if (error instanceof HttpError) {
         const fields = fieldErrorsFromHttp(error);

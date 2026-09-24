@@ -69,6 +69,7 @@ import {
     withSelectedItem,
     type DialogMode,
     type ItemResponse,
+    type CrudListPageExpose,
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
@@ -288,10 +289,14 @@ export default defineComponent({
             return this.$refs.itemDialog as ItemViewEditExpose | undefined;
         },
 
+        listPage(): CrudListPageExpose | undefined {
+            return this.$refs.listPage as CrudListPageExpose | undefined;
+        },
+
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
-            void this.$refs.listPage?.clearCadastrarQuery?.();
+            void this.listPage()?.clearCadastrarQuery?.();
         },
 
         onDialogModeChange(mode: DialogMode) {

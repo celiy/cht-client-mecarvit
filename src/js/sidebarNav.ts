@@ -39,6 +39,12 @@ function entry(item: SidebarNavItem, digit?: string): NavEntryDef {
     return { item, digit };
 }
 
+function link(label: string, href: string, leftIcon?: string): SidebarNavLink {
+    return leftIcon
+        ? { type: "link", label, link: href, leftIcon }
+        : { type: "link", label, link: href };
+}
+
 /**
  * Navigation grouped by section.
  *
@@ -67,15 +73,8 @@ const NAV_SECTIONS: NavSectionDef[] = [
                     label: "Funcionários",
                     leftIcon: "fa-users",
                     links: [
-                        {
-                            label: "Gerenciar",
-                            link: "/funcionarios"
-                        },
-                        {
-                            label: "Cadastrar",
-                            link: "/funcionarios?cadastrar=true",
-                            leftIcon: "fa-plus"
-                        }
+                        link("Gerenciar", "/funcionarios"),
+                        link("Cadastrar", "/funcionarios?cadastrar=true", "fa-plus")
                     ]
                 },
                 ACCESS.FUNCIONARIOS
@@ -86,15 +85,8 @@ const NAV_SECTIONS: NavSectionDef[] = [
                     label: "Clientes",
                     leftIcon: "fa-user",
                     links: [
-                        {
-                            label: "Gerenciar",
-                            link: "/clientes"
-                        },
-                        {
-                            label: "Cadastrar",
-                            link: "/clientes?cadastrar=true",
-                            leftIcon: "fa-plus"
-                        }
+                        link("Gerenciar", "/clientes"),
+                        link("Cadastrar", "/clientes?cadastrar=true", "fa-plus")
                     ]
                 },
                 ACCESS.CLIENTES
@@ -105,15 +97,8 @@ const NAV_SECTIONS: NavSectionDef[] = [
                     label: "Veículos",
                     leftIcon: "fa-car",
                     links: [
-                        {
-                            label: "Gerenciar",
-                            link: "/veiculos"
-                        },
-                        {
-                            label: "Cadastrar",
-                            link: "/veiculos?cadastrar=true",
-                            leftIcon: "fa-plus"
-                        }
+                        link("Gerenciar", "/veiculos"),
+                        link("Cadastrar", "/veiculos?cadastrar=true", "fa-plus")
                     ]
                 },
                 ACCESS.VEICULOS
@@ -130,15 +115,8 @@ const NAV_SECTIONS: NavSectionDef[] = [
                     leftIcon: "fa-wrench",
                     openByDefault: true,
                     links: [
-                        {
-                            label: "Gerenciar",
-                            link: "/ordem-servico"
-                        },
-                        {
-                            label: "Cadastrar",
-                            link: "/ordem-servico?cadastrar=true",
-                            leftIcon: "fa-plus"
-                        }
+                        link("Gerenciar", "/ordem-servico"),
+                        link("Cadastrar", "/ordem-servico?cadastrar=true", "fa-plus")
                     ]
                 },
                 ACCESS.OS
@@ -155,23 +133,10 @@ const NAV_SECTIONS: NavSectionDef[] = [
                     leftIcon: "fa-money-bill",
                     openByDefault: true,
                     links: [
-                        {
-                            label: "Gerenciar",
-                            link: "/registro-entrada-saida"
-                        },
-                        {
-                            label: "Entradas",
-                            link: "/registro-entrada-saida#entradas"
-                        },
-                        {
-                            label: "Saídas",
-                            link: "/registro-entrada-saida#saidas"
-                        },
-                        {
-                            label: "Cadastrar",
-                            link: "/registro-entrada-saida?cadastrar=true",
-                            leftIcon: "fa-plus"
-                        }
+                        link("Gerenciar", "/registro-entrada-saida"),
+                        link("Entradas", "/registro-entrada-saida#entradas"),
+                        link("Saídas", "/registro-entrada-saida#saidas"),
+                        link("Cadastrar", "/registro-entrada-saida?cadastrar=true", "fa-plus")
                     ]
                 },
                 ACCESS.FINANCEIRO

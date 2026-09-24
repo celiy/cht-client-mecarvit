@@ -280,11 +280,13 @@ import {
     pageCountFromTotal,
     type DialogMode,
     type ItemResponse,
+    type CrudListPageExpose,
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
 import { currentCanCreate, currentCanDelete, currentCanExport, excludeCurrentUsuario } from "../../js/mecarvit";
 import { downloadTablesPdf } from "../../js/exportTablePdf";
+import { formatTableLabel } from "../../js/formatTableLabel";
 
 interface OrdemServicoLinkApi {
     id: number;
@@ -380,9 +382,6 @@ interface RegistroFormValues {
     dataLimitePagamento: string;
 }
 
-type CrudListPageExpose = {
-    requestDelete: (item: Record<string, unknown>) => void;
-};
 
 function emptyRegistroForm(tipo = ""): RegistroFormValues {
     return {
@@ -816,7 +815,7 @@ export default defineComponent({
             this.lockValorFromOs = false;
             this.lockTipoFromOs = false;
             this.dialogPagamentos = [];
-            void this.$refs.listPage?.clearCadastrarQuery?.();
+            void this.listPage()?.clearCadastrarQuery?.();
         },
 
         onDialogModeChange(mode: DialogMode) {
@@ -915,7 +914,7 @@ export default defineComponent({
                 return;
             }
 
-            const registro = row as RegistroApi;
+            const registro = row as unknown as RegistroApi;
             const valorTotal = Number(registro.valor);
 
             this.paymentReadonly = false;
@@ -1312,7 +1311,7 @@ export default defineComponent({
 
         onSectionAction(value: string, item: Record<string, unknown>) {
             if (value === "delete") {
-                this.listPage()?.requestDelete(item);
+                this.listPage()?.requestDelete?.(item);
                 return;
             }
 

@@ -546,7 +546,7 @@ export default defineComponent({
          * the row without one, so the field dismisses it when it moves on.
          */
         closeServicoSuggestions() {
-            (this.$refs.servicoSelect as { close?: () => void } | undefined)?.close();
+            (this.$refs.servicoSelect as { close?: () => void } | undefined)?.close?.();
         },
 
         emitItems(next: OrdemServicoItemFormRow[]) {

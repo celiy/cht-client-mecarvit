@@ -178,6 +178,7 @@ import {
     notifyHttpError,
     pageCountFromTotal,
     withSelectedItem,
+    type CrudListPageExpose,
     type DialogMode,
     type ItemResponse,
     type ListResponse
@@ -626,19 +627,23 @@ export default defineComponent({
             });
         },
 
+        listPage(): CrudListPageExpose | undefined {
+            return this.$refs.listPage as CrudListPageExpose | undefined;
+        },
+
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
             this.dialogPagamentos = [];
             this.dialogOrcamento = false;
-            void this.$refs.listPage?.clearCadastrarQuery?.();
+            void this.listPage()?.clearCadastrarQuery?.();
         },
 
         onDialogOpenChange(open: boolean) {
             this.dialogOpen = open;
 
             if (!open) {
-                void this.$refs.listPage?.clearCadastrarQuery?.();
+                void this.listPage()?.clearCadastrarQuery?.();
             }
         },
 

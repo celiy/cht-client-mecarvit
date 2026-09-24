@@ -62,8 +62,8 @@
 
                 class="mt-4"
                 :id-prefix="formId"
-                :criado-em="item.criadoEm"
-                :modificado-em="item.modificadoEm"
+                :criado-em="auditTimestamp(item.criadoEm)"
+                :modificado-em="auditTimestamp(item.modificadoEm)"
             />
 
             <slot
@@ -270,6 +270,18 @@ export default defineComponent({
     },
 
     methods: {
+        auditTimestamp(value: unknown): string | number | Date | undefined {
+            if (value == null || value === "") {
+                return undefined;
+            }
+
+            if (typeof value === "string" || typeof value === "number" || value instanceof Date) {
+                return value;
+            }
+
+            return String(value);
+        },
+
         formRendererInstance(): FormRendererExpose | undefined {
             return this.$refs.formRenderer as FormRendererExpose | undefined;
         },

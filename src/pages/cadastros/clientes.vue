@@ -255,6 +255,7 @@ import {
     pageCountFromTotal,
     type DialogMode,
     type ItemResponse,
+    type CrudListPageExpose,
     type ItemViewEditExpose,
     type ListResponse,
     withSelectedItem
@@ -385,7 +386,9 @@ function emptyEnderecoForm() {
         bairro: "",
         rua: "",
         numero: "",
-        complemento: ""
+        complemento: "",
+        criadoEm: "",
+        modificadoEm: ""
     };
 }
 
@@ -395,7 +398,9 @@ function emptyVeiculoForm() {
         placa: "",
         tipo: "",
         ...emptyVeiculoFormExtras(),
-        ativo: true
+        ativo: true,
+        criadoEm: "",
+        modificadoEm: ""
     };
 }
 
@@ -684,6 +689,10 @@ export default defineComponent({
             return this.$refs.enderecoDialog as ItemViewEditExpose | undefined;
         },
 
+        listPage(): CrudListPageExpose | undefined {
+            return this.$refs.listPage as CrudListPageExpose | undefined;
+        },
+
         closeDialog() {
             this.dialogOpen = false;
             this.dialogSaving = false;
@@ -693,7 +702,7 @@ export default defineComponent({
             this.closeClienteOsDialog();
             this.closeVeiculoDialog();
             this.closeEnderecoDialog();
-            void this.$refs.listPage?.clearCadastrarQuery?.();
+            void this.listPage()?.clearCadastrarQuery?.();
         },
 
         onDialogModeChange(mode: DialogMode) {
@@ -1404,7 +1413,9 @@ export default defineComponent({
                 chassi: pending.chassi,
                 kilometragem: pending.kilometragem,
                 dataTrocaOleo: pending.dataTrocaOleo,
-                ativo: true
+                ativo: true,
+                criadoEm: "",
+                modificadoEm: ""
             };
             this.veiculoSaving = false;
             this.veiculoDialogOpen = true;
