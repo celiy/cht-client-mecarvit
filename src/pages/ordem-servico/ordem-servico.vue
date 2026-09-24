@@ -81,9 +81,12 @@
                     :can-see-pagamentos="canSeePagamentos"
                     :can-edit-itens="canEditOsItens"
                     :can-create-cliente="canCreateCliente"
-                    :lock-cliente="dialogMode !== 'create'"
+                    :can-create-veiculo="canCreateVeiculo"
+                    :can-edit-veiculo="canEditVeiculo"
+                    :lock-cliente="dialogMode !== 'create' && !canEditCliente"
                     :can-assign-responsaveis="canAssignResponsaveis"
                     :can-edit-diagnostico-cliente="canEditDiagnosticoCliente"
+                    :can-change-status="canChangeOsStatus"
                     :cliente-search-loading="clienteSearchLoading"
                     :veiculo-search-loading="veiculoSearchLoading"
                     :funcionario-search-loading="funcionarioSearchLoading"
@@ -203,6 +206,7 @@ function buildOsRowActions(
         canCreate: boolean;
         canDelete: boolean;
         canSeePagamentos: boolean;
+        canChangeStatus: boolean;
     }
 ): OptionItem[] {
     const statusOptions: OptionItem[] = statusList
@@ -227,7 +231,7 @@ function buildOsRowActions(
         });
     }
 
-    if (options.canCreate && statusOptions.length > 0) {
+    if (options.canChangeStatus && statusOptions.length > 0) {
         actions.push({
             label: "Alterar status",
             value: "status-menu",
@@ -402,11 +406,27 @@ export default defineComponent({
             return currentCanCreate("clientes");
         },
 
+        canEditCliente(): boolean {
+            return currentHasPermission(PERMISSIONS.clientes.editar);
+        },
+
+        canCreateVeiculo(): boolean {
+            return currentCanCreate("veiculos");
+        },
+
+        canEditVeiculo(): boolean {
+            return currentHasPermission(PERMISSIONS.veiculos.editar);
+        },
+
         canAssignResponsaveis(): boolean {
             return currentHasPermission(PERMISSIONS.funcionarios.editar);
         },
 
         canEditDiagnosticoCliente(): boolean {
+            return currentCanManageProfile() || this.dialogMode === "create";
+        },
+
+        canChangeOsStatus(): boolean {
             return currentCanManageProfile();
         },
 
@@ -420,7 +440,8 @@ export default defineComponent({
                 canDelete: currentCanDelete("os"),
                 canSeePagamentos:
                     currentHasPermission(PERMISSIONS.financeiro.editar)
-                    || currentCanCreate("financeiro")
+                    || currentCanCreate("financeiro"),
+                canChangeStatus: this.canChangeOsStatus
             });
         },
 
@@ -463,12 +484,14 @@ export default defineComponent({
                         { label: "Não", value: "nao" }
                     ]
                 },
-                {
-                    type: "input",
-                    value: "dataLimitePagamento",
-                    label: "Data limite",
-                    inputType: "date"
-                }
+                ...(this.canSeePagamentos
+                    ? [{
+                        type: "input" as const,
+                        value: "dataLimitePagamento",
+                        label: "Data limite",
+                        inputType: "date" as const
+                    }]
+                    : [])
             ];
         },
 
@@ -833,7 +856,7 @@ export default defineComponent({
                     ? { badge: { label: "—", color: "slate-500" } }
                     : osPagamentoBadge(
                         os.pagamentoSituacao ?? undefined,
-                        formatDateBr(osDataLimitePagamento(os))
+                        this.canSeePagamentos ? formatDateBr(osDataLimitePagamento(os)) : ""
                     )
             };
         },
@@ -996,7 +1019,7 @@ export default defineComponent({
         },
 
         async quickChangeOsStatus(osId: number, statusOsId: number, currentStatusId: number) {
-            if (statusOsId === currentStatusId) {
+            if (!this.canChangeOsStatus || statusOsId === currentStatusId) {
                 return;
             }
 
@@ -1432,6 +1455,15 @@ export default defineComponent({
                 return existing;
             }
 
+            const nomeBusca = payload.clienteNome.trim().toLowerCase();
+            const namedMatches = this.formClientes.filter(
+                (cliente) => cliente.nome.trim().toLowerCase() === nomeBusca && cliente.documento
+            );
+
+            if (namedMatches.length === 1 && namedMatches[0]) {
+                return documentDigits(namedMatches[0].documento);
+            }
+
             if (!this.canCreateCliente) {
                 throw new Error("Selecione um cliente existente.");
             }
@@ -1515,6 +1547,10 @@ export default defineComponent({
 
             if (Number.isInteger(existingId) && existingId > 0) {
                 return existingId;
+            }
+
+            if (!this.canCreateVeiculo) {
+                throw new Error("Selecione um veículo existente.");
             }
 
             const kilometragemRaw = payload.veiculoKilometragem.trim();
@@ -1609,7 +1645,8 @@ export default defineComponent({
 
                     await this.$http.patch(`/api/ordem-servico/${id}`, {
                         diagnosticoMecanico: optionalTextForSave(payload.diagnosticoMecanico, false),
-                        obs: optionalTextForSave(payload.obs, false)
+                        obs: optionalTextForSave(payload.obs, false),
+                        itens: this.itensPayload(payload.itens)
                     });
                     this.$toast.success("Ordem de serviço atualizada.");
                     this.closeDialog();
@@ -1625,7 +1662,7 @@ export default defineComponent({
 
                 const veiculoId = await this.resolveVeiculoId(payload, clienteDocumento);
 
-                if (this.dialogMode !== "create" && this.canCreateCliente) {
+                if (this.dialogMode !== "create" && this.canEditVeiculo) {
                     await this.syncVeiculoFieldsIfNeeded(veiculoId, payload);
                 }
 
@@ -1634,11 +1671,17 @@ export default defineComponent({
                 const body: Record<string, unknown> = {
                     clienteDocumento,
                     veiculoId,
-                    statusOsId: Number(payload.statusOsId),
-                    diagnosticoCliente: optionalTextForSave(payload.diagnosticoCliente, isCreate),
+                    statusOsId: isCreate || this.canChangeOsStatus
+                        ? Number(payload.statusOsId)
+                        : undefined,
+                    diagnosticoCliente: this.canEditDiagnosticoCliente
+                        ? optionalTextForSave(payload.diagnosticoCliente, isCreate)
+                        : undefined,
                     diagnosticoMecanico: optionalTextForSave(payload.diagnosticoMecanico, isCreate),
                     obs: optionalTextForSave(payload.obs, isCreate),
-                    dataLimitePagamento: optionalTextForSave(payload.dataLimitePagamento, isCreate),
+                    dataLimitePagamento: this.canSeePagamentos
+                        ? optionalTextForSave(payload.dataLimitePagamento, isCreate)
+                        : undefined,
                     itens: this.itensPayload(payload.itens)
                 };
 

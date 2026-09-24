@@ -58,15 +58,8 @@
                             label="Oficina"
                             header="Selecione a oficina"
                             :options="empresaOptions"
+                            :error="errors.empresaId"
                         />
-
-                        <p
-                            v-if="errors.empresaId"
-
-                            class="mt-2 text-sm text-destructive"
-                        >
-                            {{ errors.empresaId }}
-                        </p>
                     </div>
 
                     <Item
@@ -187,6 +180,12 @@ export default defineComponent({
             this.clearErrors();
 
             const empresaId = this.parsedEmpresaId();
+
+            if (this.empresaOptions.length > 1 && empresaId === undefined) {
+                this.errors.empresaId = "Selecione a oficina";
+                return;
+            }
+
             const payload = {
                 email: this.email.trim(),
                 senha: this.senha,
@@ -223,14 +222,14 @@ export default defineComponent({
 
                     if (empresas.length > 1) {
                         this.empresas = empresas;
-                        this.formError = "Selecione a oficina para continuar.";
+                        this.errors.empresaId = empresaId === undefined ? "Selecione a oficina" : "";
                     } else {
                         this.formError = error.message;
+                        this.errors.empresaId = error.fields?.empresaId ?? "";
                     }
 
                     this.errors.email = error.fields?.email ?? "";
                     this.errors.senha = error.fields?.senha ?? error.fields?.password ?? "";
-                    this.errors.empresaId = error.fields?.empresaId ?? "";
                     return;
                 }
 

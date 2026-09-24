@@ -94,7 +94,7 @@
                                         :mobile-modal="false"
                                         :external-search-loading="servicoSearchLoading"
 
-                                        @keydown.enter="preventRowEnter"
+                                        @keydown.enter="onCommittedServicoEnter(index, $event)"
                                         @update:query="onItemServicoNomeInput(index, $event)"
                                         @update:value="onItemServicoSelectValue(index, $event)"
                                         @search:external="onServicoSearchExternal"
@@ -453,6 +453,21 @@ export default defineComponent({
 
         preventRowEnter(event: KeyboardEvent) {
             event.preventDefault();
+        },
+
+        /**
+         * Let the suggestion panel own Enter when it has a match; otherwise
+         * move to quantity like the draft row.
+         */
+        onCommittedServicoEnter(index: number, event: KeyboardEvent) {
+            if (suggestionsPanelHasOptions()) {
+                return;
+            }
+
+            event.preventDefault();
+            this.$nextTick(() => {
+                document.getElementById(this.committedFieldId(index, "quantidade"))?.focus();
+            });
         },
 
         committedFieldId(index: number, field: DraftField): string {

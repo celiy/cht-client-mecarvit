@@ -103,6 +103,7 @@
             :fields="cargoFields"
             :saving="cargoSaving"
             :form-key="cargoDialogKey"
+            hide-mode-toggle
 
             @save="onSaveCargo"
             @cancel="closeCargoDialog"
@@ -153,8 +154,10 @@ import {
     ACCESS_LEVEL_HELP,
     areaLevelsFromKeys,
     keysFromAreaLevels,
+    keysFromPermissionTokens,
     levelsFromPermissionTokens,
     parsePermissions,
+    tokensFromPermissionKeys,
     permissionToken,
     tokensFromAreaLevels,
     togglePermissionTokens,
@@ -212,6 +215,104 @@ function emptyCargoForm(): CargoFormValues {
         }),
         gerente: false
     };
+}
+
+function selectedAreaPermissionsLabel(area: AccessAreaKey, tokens: readonly string[]): string {
+    const areaTokens = tokens.filter((token) => token.startsWith(`${area}:`));
+
+    if (areaTokens.length === 0 || areaTokens.includes(permissionToken(area, "none"))) {
+        const noneLevel = ACCESS_LEVELS.find((level) => level.key === "none");
+
+        return noneLevel?.label ?? "Nenhum";
+    }
+
+    return ACCESS_LEVELS.filter(
+        (level) => level.key !== "none" && areaTokens.includes(permissionToken(area, level.key))
+    )
+        .map((level) => level.label)
+        .join(", ");
+}
+
+const OS_DEPENDENT_VIEW_AREAS: AccessAreaKey[] = [
+    "funcionarios",
+    "clientes",
+    "veiculos",
+    "financeiro"
+];
+
+function ensurePermissionTokensPerArea(tokens: readonly string[]): string[] {
+    const next = [...tokens];
+
+    for (const area of ACCESS_AREAS) {
+        const hasAreaToken = next.some((token) => token.startsWith(`${area.key}:`));
+
+        if (!hasAreaToken) {
+            next.push(permissionToken(area.key, "none"));
+        }
+    }
+
+    return next;
+}
+
+function osRequiresDependentView(tokens: readonly string[]): boolean {
+    const levels = levelsFromPermissionTokens(tokens);
+
+    return (levels.os ?? "none") !== "none";
+}
+
+function enforceOsDependentMinimumView(tokens: readonly string[]): string[] {
+    let next = ensurePermissionTokensPerArea(tokens);
+
+    if (!osRequiresDependentView(next)) {
+        return next;
+    }
+
+    for (const area of OS_DEPENDENT_VIEW_AREAS) {
+        const levels = levelsFromPermissionTokens(next);
+        const areaLevel = levels[area] ?? "none";
+
+        if (areaLevel === "none") {
+            next = togglePermissionTokens(
+                next.filter((token) => !token.startsWith(`${area}:`)),
+                area,
+                "ver"
+            );
+            continue;
+        }
+
+        if (!next.includes(permissionToken(area, "ver"))) {
+            next.push(permissionToken(area, "ver"));
+        }
+    }
+
+    return ensurePermissionTokensPerArea(next);
+}
+
+function isOsLockedPermissionOption(
+    area: AccessAreaKey,
+    level: AccessLevelKey,
+    tokens: readonly string[],
+    gerente: boolean
+): boolean {
+    if (gerente || !osRequiresDependentView(tokens)) {
+        return false;
+    }
+
+    if (!OS_DEPENDENT_VIEW_AREAS.includes(area)) {
+        return false;
+    }
+
+    const areaLevel = levelsFromPermissionTokens(tokens)[area] ?? "none";
+
+    if (level === "none") {
+        return true;
+    }
+
+    if (level === "ver" && areaLevel === "ver") {
+        return true;
+    }
+
+    return false;
 }
 
 function emptyFormValues(): FuncionarioFormValues {
@@ -332,7 +433,9 @@ export default defineComponent({
                 return CRUD_ROW_ACTIONS;
             }
 
-            return CRUD_ROW_ACTIONS.filter((action) => action.value !== "delete" && !action.separator);
+            return CRUD_ROW_ACTIONS.filter(
+                (action) => action.value !== "delete" && !action.separator
+            );
         },
         tableRows() {
             return this.funcionarios as unknown as Array<Record<string, unknown>>;
@@ -465,6 +568,7 @@ export default defineComponent({
 
         cargoFields(): FormField[] {
             const gerente = Boolean(this.cargoItem.gerente);
+            const permissionTokens = this.cargoItem.permissoes ?? [];
             const areaOptions = ACCESS_AREAS.map((area) => {
                 const levels = ACCESS_LEVELS.filter((level) => {
                     if (area.key !== "funcionarios" || gerente) {
@@ -477,10 +581,17 @@ export default defineComponent({
                 return {
                     label: area.label,
                     value: area.key,
+                    optionHelperText: selectedAreaPermissionsLabel(area.key, permissionTokens),
                     options: levels.map((level) => ({
                         label: level.label,
                         value: permissionToken(area.key, level.key),
-                        optionHelperText: ACCESS_LEVEL_HELP[level.key]
+                        optionHelperText: ACCESS_LEVEL_HELP[level.key],
+                        disabled: isOsLockedPermissionOption(
+                            area.key,
+                            level.key,
+                            permissionTokens,
+                            gerente
+                        )
                     }))
                 };
             });
@@ -495,9 +606,11 @@ export default defineComponent({
                 {
                     id: "permissoes",
                     label: "Áreas do sistema",
-                    placeholder: "Permissões por área",
+                    placeholder: "Permissões",
                     type: "select",
                     selectMultiple: { min: 0 },
+                    selectShowSelectedLabels: false,
+                    disabled: gerente,
                     options: areaOptions
                 },
                 {
@@ -506,8 +619,7 @@ export default defineComponent({
                     type: "checkbox",
                     checkboxStyle: "normal",
                     variant: "card",
-                    description:
-                        "Libera dados sensíveis (CPF/CNPJ) e o gerenciamento de funcionários."
+                    description: "Libera dados sensíveis (CPF/CNPJ) e o gerenciamento do sistema."
                 }
             ];
         }
@@ -661,7 +773,11 @@ export default defineComponent({
             this.exporting = true;
 
             try {
-                const rows = await fetchAllList<UsuarioApi>(this.$http.get.bind(this.$http), "/api/usuario", this.filters);
+                const rows = await fetchAllList<UsuarioApi>(
+                    this.$http.get.bind(this.$http),
+                    "/api/usuario",
+                    this.filters
+                );
                 downloadTablePdf(
                     "Funcionários",
                     this.tableHeaders,
@@ -800,7 +916,9 @@ export default defineComponent({
                 id: cargo.id,
                 nome: cargo.nome,
                 gerente: parsed.gerente,
-                permissoes: tokensFromAreaLevels(parsed.levels)
+                permissoes: enforceOsDependentMinimumView(
+                    tokensFromPermissionKeys(parsePermissions(String(cargo.nivelAcesso ?? "")))
+                )
             };
             this.cargoSaving = false;
             this.cargoDialogOpen = true;
@@ -829,10 +947,10 @@ export default defineComponent({
             }
 
             const selected = String(
-                this.itemDialog()?.getFieldValue("cargoId")
-                ?? this.selectedCargoId
-                ?? this.dialogItem.cargoId
-                ?? ""
+                this.itemDialog()?.getFieldValue("cargoId") ??
+                    this.selectedCargoId ??
+                    this.dialogItem.cargoId ??
+                    ""
             );
 
             if (selected && this.canManageCargos) {
@@ -856,9 +974,21 @@ export default defineComponent({
             const tokens = Array.isArray(payload.permissoes)
                 ? payload.permissoes.map((item) => String(item))
                 : [];
-            const levels = levelsFromPermissionTokens(tokens);
 
-            return keysFromAreaLevels(levels, gerente);
+            if (gerente) {
+                return keysFromAreaLevels(
+                    {
+                        funcionarios: "excluir",
+                        clientes: "excluir",
+                        veiculos: "excluir",
+                        os: "excluir",
+                        financeiro: "excluir"
+                    },
+                    true
+                );
+            }
+
+            return keysFromPermissionTokens(tokens);
         },
 
         onCargoFieldChange(payload: { id: string; value: unknown }) {
@@ -900,14 +1030,18 @@ export default defineComponent({
             }
 
             const tokens = payload.value.map((item) => String(item));
-            const last = tokens[tokens.length - 1];
+            const previous = (this.cargoItem.permissoes ?? []).map((item) => String(item));
+            const previousSet = new Set(previous);
+            const added = tokens.filter((token) => !previousSet.has(token));
+            const removed = previous.filter((token) => !tokens.includes(token));
+            const changed = added[added.length - 1] ?? removed[0];
 
-            if (!last) {
+            if (!changed) {
                 this.cargoItem.permissoes = tokens;
                 return;
             }
 
-            const parsed = last.split(":");
+            const parsed = changed.split(":");
             const area = parsed[0] as AccessAreaKey | undefined;
             const level = parsed[1] as AccessLevelKey | undefined;
 
@@ -916,7 +1050,7 @@ export default defineComponent({
                 return;
             }
 
-            const cascaded = togglePermissionTokens(tokens, area, level);
+            const cascaded = togglePermissionTokens(previous, area, level);
             let next = cascaded;
 
             if (level === "ver" || level === "editar") {
@@ -927,6 +1061,8 @@ export default defineComponent({
                     next = togglePermissionTokens(next, "financeiro", "ver");
                 }
             }
+
+            next = enforceOsDependentMinimumView(next);
 
             this.cargoItem.permissoes = next;
 
