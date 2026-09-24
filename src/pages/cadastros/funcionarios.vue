@@ -44,6 +44,7 @@
             @update:mode="onDialogModeChange"
             @click:select-action="onUsuarioSelectAction"
             @search:external="onSearchExternal"
+            @update:field="onUsuarioFieldChange"
         >
             <template
                 v-if="dialogMode !== 'view'"
@@ -95,8 +96,8 @@
             ref="cargoDialog"
 
             v-model:is-open="cargoDialogOpen"
-            header="Novo cargo"
-            mode="create"
+            :header="cargoDialogHeader"
+            :mode="cargoDialogMode"
             size="small"
             :item="cargoItem"
             :fields="cargoFields"
@@ -105,6 +106,7 @@
 
             @save="onSaveCargo"
             @cancel="closeCargoDialog"
+            @update:field="onCargoFieldChange"
         />
     </CrudListPage>
 </template>
@@ -139,6 +141,7 @@ import {
     currentCanExport,
     currentCanSeePii,
     currentIsSuperadmin,
+    currentCanManageCargos,
     excludeCurrentUsuario,
     excludeSuperadminCargos,
     isUsuarioSuperadmin
@@ -147,7 +150,14 @@ import { downloadTablePdf } from "../../js/exportTablePdf";
 import {
     ACCESS_AREAS,
     ACCESS_LEVELS,
+    ACCESS_LEVEL_HELP,
+    areaLevelsFromKeys,
     keysFromAreaLevels,
+    levelsFromPermissionTokens,
+    parsePermissions,
+    permissionToken,
+    tokensFromAreaLevels,
+    togglePermissionTokens,
     type AccessAreaKey,
     type AccessLevelKey
 } from "@shared/mecarvit/access";
@@ -184,23 +194,22 @@ interface FuncionarioFormValues {
 }
 
 interface CargoFormValues {
+    id?: number;
     nome: string;
-    funcionarios: AccessLevelKey;
-    clientes: AccessLevelKey;
-    veiculos: AccessLevelKey;
-    os: AccessLevelKey;
-    financeiro: AccessLevelKey;
+    permissoes: string[];
     gerente: boolean;
 }
 
 function emptyCargoForm(): CargoFormValues {
     return {
         nome: "",
-        funcionarios: "none",
-        clientes: "none",
-        veiculos: "none",
-        os: "none",
-        financeiro: "none",
+        permissoes: tokensFromAreaLevels({
+            funcionarios: "none",
+            clientes: "none",
+            veiculos: "none",
+            os: "none",
+            financeiro: "none"
+        }),
         gerente: false
     };
 }
@@ -269,9 +278,12 @@ export default defineComponent({
             dialogKey: 0,
             cargoDialogOpen: false,
             cargoSaving: false,
+            cargoDialogMode: "create" as DialogMode,
             cargoItem: emptyCargoForm() as CargoFormValues,
             cargoDialogKey: 0,
             cargoSearchSeq: 0,
+            cargoSearchLoading: false,
+            selectedCargoId: "",
             page: 1,
             pageLimit: 10,
             pageCount: 0,
@@ -297,6 +309,14 @@ export default defineComponent({
 
         canResetPassword(): boolean {
             return currentIsSuperadmin();
+        },
+
+        canManageCargos(): boolean {
+            return currentCanManageCargos();
+        },
+
+        cargoDialogHeader(): string {
+            return this.cargoDialogMode === "edit" ? "Editar cargo" : "Novo cargo";
         },
 
         tableHeaders(): TableHeader[] {
@@ -346,7 +366,8 @@ export default defineComponent({
                     id: "email",
                     label: "Email",
                     type: "email",
-                    required: true
+                    required: true,
+                    autocomplete: "off"
                 }
             ];
 
@@ -367,7 +388,8 @@ export default defineComponent({
                     type: "password",
                     required: true,
                     minSize: PASSWORD_MIN_LENGTH,
-                    helperText: `Mínimo de ${PASSWORD_MIN_LENGTH} caracteres`
+                    helperText: `Mínimo de ${PASSWORD_MIN_LENGTH} caracteres`,
+                    autocomplete: "new-password"
                 });
             } else if (this.senhaResetTriggered) {
                 fields.push({
@@ -376,7 +398,8 @@ export default defineComponent({
                     type: "password",
                     required: true,
                     minSize: PASSWORD_MIN_LENGTH,
-                    helperText: `Mínimo de ${PASSWORD_MIN_LENGTH} caracteres`
+                    helperText: `Mínimo de ${PASSWORD_MIN_LENGTH} caracteres`,
+                    autocomplete: "new-password"
                 });
             }
 
@@ -399,14 +422,8 @@ export default defineComponent({
                         external: true,
                         field: "nome"
                     },
-                    selectAction:
-                        this.dialogMode === "view"
-                            ? undefined
-                            : {
-                                  icon: "fa-plus",
-                                  side: "right",
-                                  tooltip: "Cadastrar cargo"
-                              }
+                    selectSearchLoading: this.cargoSearchLoading,
+                    selectAction: this.cargoSelectAction
                 });
             }
 
@@ -424,19 +441,49 @@ export default defineComponent({
             return fields;
         },
 
-        cargoFields(): FormField[] {
-            const levelOptions = ACCESS_LEVELS.map((level) => ({
-                label: level.label,
-                value: level.key
-            }));
+        cargoSelectAction() {
+            if (this.dialogMode === "view" || !this.canManageCargos) {
+                return undefined;
+            }
 
-            const areaFields: FormField[] = ACCESS_AREAS.map((area) => ({
-                id: area.key,
-                label: area.label,
-                placeholder: "Nível de acesso",
-                type: "select",
-                options: levelOptions
-            }));
+            const selected = String(this.selectedCargoId || this.dialogItem.cargoId || "").trim();
+
+            if (selected) {
+                return {
+                    icon: "fa-pen",
+                    side: "right" as const,
+                    tooltip: "Editar cargo"
+                };
+            }
+
+            return {
+                icon: "fa-plus",
+                side: "right" as const,
+                tooltip: "Cadastrar cargo"
+            };
+        },
+
+        cargoFields(): FormField[] {
+            const gerente = Boolean(this.cargoItem.gerente);
+            const areaOptions = ACCESS_AREAS.map((area) => {
+                const levels = ACCESS_LEVELS.filter((level) => {
+                    if (area.key !== "funcionarios" || gerente) {
+                        return true;
+                    }
+
+                    return level.key === "none" || level.key === "ver";
+                });
+
+                return {
+                    label: area.label,
+                    value: area.key,
+                    options: levels.map((level) => ({
+                        label: level.label,
+                        value: permissionToken(area.key, level.key),
+                        optionHelperText: ACCESS_LEVEL_HELP[level.key]
+                    }))
+                };
+            });
 
             return [
                 {
@@ -445,14 +492,22 @@ export default defineComponent({
                     type: "text",
                     required: true
                 },
-                ...areaFields,
+                {
+                    id: "permissoes",
+                    label: "Áreas do sistema",
+                    placeholder: "Permissões por área",
+                    type: "select",
+                    selectMultiple: { min: 0 },
+                    options: areaOptions
+                },
                 {
                     id: "gerente",
                     label: "Cargo de gerente",
                     type: "checkbox",
-                    checkboxStyle: "switch",
+                    checkboxStyle: "normal",
+                    variant: "card",
                     description:
-                        "Permite ver e editar dados sensíveis como CPF e CNPJ nas áreas com acesso."
+                        "Libera dados sensíveis (CPF/CNPJ) e o gerenciamento de funcionários."
                 }
             ];
         }
@@ -541,6 +596,7 @@ export default defineComponent({
         async getCargos(query = "", field = "nome") {
             this.cargoSearchSeq += 1;
             const seq = this.cargoSearchSeq;
+            this.cargoSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -570,6 +626,10 @@ export default defineComponent({
                 this.cargos = withSelectedItem(rows, selectedForList, (cargo) => String(cargo.id));
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os cargos.");
+            } finally {
+                if (seq === this.cargoSearchSeq) {
+                    this.cargoSearchLoading = false;
+                }
             }
         },
 
@@ -627,6 +687,7 @@ export default defineComponent({
             this.dialogUsuarioSuperadmin = isUsuarioSuperadmin(usuarioMeta ?? {});
             this.dialogSaving = false;
             this.dialogOpen = true;
+            this.selectedCargoId = String(item.cargoId ?? "");
 
             if (cargo) {
                 this.cargos = withSelectedItem(this.cargos, cargo, (entry) => String(entry.id));
@@ -714,9 +775,43 @@ export default defineComponent({
 
         openCargoCreateDialog() {
             this.cargoDialogKey += 1;
+            this.cargoDialogMode = "create";
             this.cargoItem = emptyCargoForm();
             this.cargoSaving = false;
             this.cargoDialogOpen = true;
+        },
+
+        openCargoEditDialog() {
+            const selectedId = String(
+                this.itemDialog()?.getFieldValue("cargoId") ?? this.dialogItem.cargoId ?? ""
+            );
+            const cargo = this.cargos.find((item) => String(item.id) === selectedId);
+
+            if (!cargo) {
+                this.openCargoCreateDialog();
+                return;
+            }
+
+            const parsed = areaLevelsFromKeys(parsePermissions(String(cargo.nivelAcesso ?? "")));
+
+            this.cargoDialogKey += 1;
+            this.cargoDialogMode = "edit";
+            this.cargoItem = {
+                id: cargo.id,
+                nome: cargo.nome,
+                gerente: parsed.gerente,
+                permissoes: tokensFromAreaLevels(parsed.levels)
+            };
+            this.cargoSaving = false;
+            this.cargoDialogOpen = true;
+        },
+
+        onUsuarioFieldChange(payload: { id: string; value: unknown }) {
+            if (payload.id !== "cargoId") {
+                return;
+            }
+
+            this.selectedCargoId = String(payload.value ?? "");
         },
 
         onCargoSelectInsidePanel() {
@@ -733,6 +828,18 @@ export default defineComponent({
                 return;
             }
 
+            const selected = String(
+                this.itemDialog()?.getFieldValue("cargoId")
+                ?? this.selectedCargoId
+                ?? this.dialogItem.cargoId
+                ?? ""
+            );
+
+            if (selected && this.canManageCargos) {
+                this.openCargoEditDialog();
+                return;
+            }
+
             this.openCargoCreateDialog();
         },
 
@@ -745,26 +852,119 @@ export default defineComponent({
         },
 
         nivelAcessoFromPayload(payload: Record<string, unknown>): string[] {
-            const levels = {} as Record<AccessAreaKey, AccessLevelKey>;
+            const gerente = Boolean(payload.gerente);
+            const tokens = Array.isArray(payload.permissoes)
+                ? payload.permissoes.map((item) => String(item))
+                : [];
+            const levels = levelsFromPermissionTokens(tokens);
 
-            for (const area of ACCESS_AREAS) {
-                const raw = String(payload[area.key] ?? "none");
-                levels[area.key] = ACCESS_LEVELS.some((level) => level.key === raw)
-                    ? (raw as AccessLevelKey)
-                    : "none";
+            return keysFromAreaLevels(levels, gerente);
+        },
+
+        onCargoFieldChange(payload: { id: string; value: unknown }) {
+            if (payload.id === "gerente") {
+                const gerente = Boolean(payload.value);
+                this.cargoItem = {
+                    ...this.cargoItem,
+                    gerente
+                };
+
+                if (!gerente) {
+                    return;
+                }
+
+                const full = tokensFromAreaLevels({
+                    funcionarios: "excluir",
+                    clientes: "excluir",
+                    veiculos: "excluir",
+                    os: "excluir",
+                    financeiro: "excluir"
+                });
+
+                const withExport = [
+                    ...full,
+                    permissionToken("funcionarios", "exportar"),
+                    permissionToken("clientes", "exportar"),
+                    permissionToken("veiculos", "exportar"),
+                    permissionToken("os", "exportar"),
+                    permissionToken("financeiro", "exportar")
+                ];
+
+                this.cargoDialogRef()?.setFieldValue("permissoes", withExport);
+                this.cargoItem.permissoes = withExport;
+                return;
             }
 
-            return keysFromAreaLevels(levels, Boolean(payload.gerente));
+            if (payload.id !== "permissoes" || !Array.isArray(payload.value)) {
+                return;
+            }
+
+            const tokens = payload.value.map((item) => String(item));
+            const last = tokens[tokens.length - 1];
+
+            if (!last) {
+                this.cargoItem.permissoes = tokens;
+                return;
+            }
+
+            const parsed = last.split(":");
+            const area = parsed[0] as AccessAreaKey | undefined;
+            const level = parsed[1] as AccessLevelKey | undefined;
+
+            if (!area || !level) {
+                this.cargoItem.permissoes = tokens;
+                return;
+            }
+
+            const cascaded = togglePermissionTokens(tokens, area, level);
+            let next = cascaded;
+
+            if (level === "ver" || level === "editar") {
+                if (area === "os") {
+                    next = togglePermissionTokens(next, "funcionarios", "ver");
+                    next = togglePermissionTokens(next, "clientes", "ver");
+                    next = togglePermissionTokens(next, "veiculos", "ver");
+                    next = togglePermissionTokens(next, "financeiro", "ver");
+                }
+            }
+
+            this.cargoItem.permissoes = next;
+
+            if (JSON.stringify([...next].sort()) !== JSON.stringify([...tokens].sort())) {
+                this.cargoDialogRef()?.setFieldValue("permissoes", next);
+            }
         },
 
         async onSaveCargo(payload: Record<string, unknown>) {
             this.cargoSaving = true;
 
             try {
-                const response = await this.$http.post<ItemResponse<CargoApi>>("/api/cargo", {
+                const body = {
                     nome: payload.nome,
                     nivelAcesso: this.nivelAcessoFromPayload(payload)
-                });
+                };
+
+                if (this.cargoDialogMode === "edit" && this.cargoItem.id) {
+                    const response = await this.$http.put<ItemResponse<CargoApi>>(
+                        `/api/cargo/${this.cargoItem.id}`,
+                        body
+                    );
+                    const updated = response.data.data;
+
+                    if (!updated) {
+                        this.$toast.error("Não foi possível atualizar o cargo.");
+                        return;
+                    }
+
+                    this.cargos = this.cargos.map((cargo) =>
+                        cargo.id === updated.id ? updated : cargo
+                    );
+                    this.closeCargoDialog();
+                    this.$toast.success("Cargo atualizado.");
+                    return;
+                }
+
+                const response = await this.$http.post<ItemResponse<CargoApi>>("/api/cargo", body);
                 const created = response.data.data;
 
                 if (!created) {
@@ -783,7 +983,7 @@ export default defineComponent({
                 notifyHttpError(
                     this.$toast,
                     error,
-                    "Não foi possível criar o cargo.",
+                    "Não foi possível salvar o cargo.",
                     this.cargoDialogRef()
                 );
             } finally {

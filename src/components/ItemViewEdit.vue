@@ -27,6 +27,7 @@
                 @click:select-option="onSelectOption"
                 @click:select-remove="onSelectRemove"
                 @search:external="onSearchExternal"
+                @update:field="$emit('update:field', $event)"
             >
                 <template
                     v-if="$slots['select-inside-empty-panel']"
@@ -242,7 +243,8 @@ export default defineComponent({
         "click:select-action",
         "click:select-option",
         "click:select-remove",
-        "search:external"
+        "search:external",
+        "update:field"
     ],
 
     computed: {

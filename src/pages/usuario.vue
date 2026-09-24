@@ -14,6 +14,7 @@
                         :fields="profileFields"
                         :values="profileValues"
                         :section-columns="1"
+                        :readonly="!canManageProfile"
 
                         @submit="onSaveProfile"
                     />
@@ -23,6 +24,7 @@
                     <div class="flex justify-between gap-2">
                         <div>
                             <Button
+                                v-if="canManageProfile"
                                 label="Trocar senha"
 
                                 @click="changePassword = !changePassword"
@@ -31,6 +33,7 @@
 
                         <div class="flex gap-2">
                             <Button
+                                v-if="canManageProfile"
                                 type="submit"
                                 form="usuario-profile-form"
                                 variant="primary"
@@ -84,7 +87,7 @@ import Button from "@design/components/Button.vue";
 import FormRenderer from "@design/components/form/FormRenderer.vue";
 import ChangePasswordForm from "../components/ChangePasswordForm.vue";
 import { clearAuthToken } from "@base/http";
-import { clearMecarvitSession, loadCurrentUser, mecarvit } from "../js/mecarvit";
+import { clearMecarvitSession, loadCurrentUser, mecarvit, currentCanManageProfile } from "../js/mecarvit";
 import { documentDigits, notifyHttpError } from "../js/crudHttp";
 import { HttpError } from "@base/http";
 
@@ -118,6 +121,10 @@ export default defineComponent({
     },
 
     computed: {
+        canManageProfile(): boolean {
+            return currentCanManageProfile();
+        },
+
         profileFields(): FormField[] {
             return [
                 {

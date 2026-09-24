@@ -4,6 +4,7 @@ import { http } from "@base/http";
 import {
     hasPermission,
     isSuperadmin,
+    PERMISSIONS,
     type AccessAreaKey
 } from "@shared/mecarvit/access";
 
@@ -113,6 +114,18 @@ export function currentCanSeePii(area: "clientes" | "funcionarios"): boolean {
 
 export function currentIsSuperadmin(): boolean {
     return isUsuarioSuperadmin(mecarvit.user ?? {});
+}
+
+function currentIsGerente(): boolean {
+    return hasPermission(currentNivelAcesso(), PERMISSIONS.GERENTE) || currentIsSuperadmin();
+}
+
+export function currentCanManageProfile(): boolean {
+    return currentIsGerente();
+}
+
+export function currentCanManageCargos(): boolean {
+    return currentIsGerente();
 }
 
 export function excludeSuperadminCargos<T extends { nivelAcesso?: string }>(cargos: T[]): T[] {

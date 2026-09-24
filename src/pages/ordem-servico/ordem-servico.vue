@@ -12,6 +12,7 @@
         delete-name-field="idLabel"
         :actions="rowActions"
         :filter-select-options="filterSelectOptions"
+        :filter-select-search-loading="filterSelectSearchLoading"
         :show-export="canExport"
         :exporting="exporting"
         empty-title="Nenhuma ordem de serviço encontrada."
@@ -79,6 +80,14 @@
                     :can-see-cliente-pii="canSeeClientePii"
                     :can-see-pagamentos="canSeePagamentos"
                     :can-edit-itens="canEditOsItens"
+                    :can-create-cliente="canCreateCliente"
+                    :lock-cliente="dialogMode !== 'create'"
+                    :can-assign-responsaveis="canAssignResponsaveis"
+                    :can-edit-diagnostico-cliente="canEditDiagnosticoCliente"
+                    :cliente-search-loading="clienteSearchLoading"
+                    :veiculo-search-loading="veiculoSearchLoading"
+                    :funcionario-search-loading="funcionarioSearchLoading"
+                    :servico-search-loading="servicoSearchLoading"
 
                     @submit="onSave"
                     @search:external="onSearchExternal"
@@ -180,6 +189,7 @@ import {
     currentCanSeePii,
     currentHasPermission,
     currentUsuarioCpfDigits,
+    currentCanManageProfile,
     excludeCurrentUsuario
 } from "../../js/mecarvit";
 import { PERMISSIONS } from "@shared/mecarvit/access";
@@ -195,7 +205,9 @@ function buildOsRowActions(
         canSeePagamentos: boolean;
     }
 ): OptionItem[] {
-    const statusOptions: OptionItem[] = statusList.map((status) => ({
+    const statusOptions: OptionItem[] = statusList
+        .filter((status) => status.id !== 6)
+        .map((status) => ({
         label: formatTableLabel(status.nome),
         value: `${OS_STATUS_ACTION_PREFIX}${status.id}`,
         indicator: osStatusIndicator(status.id)
@@ -339,6 +351,12 @@ export default defineComponent({
             veiculoSearchSeq: 0,
             funcionarioSearchSeq: 0,
             servicoSearchSeq: 0,
+            clienteSearchLoading: false,
+            veiculoSearchLoading: false,
+            funcionarioSearchLoading: false,
+            servicoSearchLoading: false,
+            filterClienteSearchLoading: false,
+            filterVeiculoSearchLoading: false,
             servicoSuggestions: [] as ServicoApi[],
             filterClienteOptions: [] as Array<{ label: string; value: string }>,
             filterVeiculoOptions: [] as Array<{ label: string; value: string }>,
@@ -365,11 +383,31 @@ export default defineComponent({
         },
 
         canSeePagamentos(): boolean {
-            return currentHasPermission(PERMISSIONS.os.pagamentos);
+            return currentHasPermission(PERMISSIONS.financeiro.editar)
+                || currentCanCreate("financeiro");
+        },
+
+        filterSelectSearchLoading(): Record<string, boolean> {
+            return {
+                cliente: this.filterClienteSearchLoading,
+                veiculo: this.filterVeiculoSearchLoading
+            };
         },
 
         canEditOsItens(): boolean {
-            return this.canCreate;
+            return this.canCreate || currentHasPermission(PERMISSIONS.os.editar);
+        },
+
+        canCreateCliente(): boolean {
+            return currentCanCreate("clientes");
+        },
+
+        canAssignResponsaveis(): boolean {
+            return currentHasPermission(PERMISSIONS.funcionarios.editar);
+        },
+
+        canEditDiagnosticoCliente(): boolean {
+            return currentCanManageProfile();
         },
 
         restrictedOsEdit(): boolean {
@@ -380,7 +418,9 @@ export default defineComponent({
             return buildOsRowActions(this.statusOs, {
                 canCreate: this.canCreate,
                 canDelete: currentCanDelete("os"),
-                canSeePagamentos: this.canSeePagamentos
+                canSeePagamentos:
+                    currentHasPermission(PERMISSIONS.financeiro.editar)
+                    || currentCanCreate("financeiro")
             });
         },
 
@@ -490,11 +530,19 @@ export default defineComponent({
         },
 
         statusSelectOptions() {
-            return this.statusOs.map((status) => ({
-                label: formatTableLabel(status.nome),
-                value: String(status.id),
-                indicator: osStatusIndicator(status.id)
-            }));
+            return this.statusOs
+                .filter((status) => {
+                    if (status.id !== 6) {
+                        return true;
+                    }
+
+                    return this.dialogOrcamento || this.dialogItem.statusOsId === "6";
+                })
+                .map((status) => ({
+                    label: formatTableLabel(status.nome),
+                    value: String(status.id),
+                    indicator: osStatusIndicator(status.id)
+                }));
         },
 
         funcionarioSelectOptions() {
@@ -665,6 +713,7 @@ export default defineComponent({
         async searchFilterClientes(query: string, field: string) {
             this.filterClienteSearchSeq += 1;
             const seq = this.filterClienteSearchSeq;
+            this.filterClienteSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -691,12 +740,17 @@ export default defineComponent({
                 }
 
                 this.filterClienteOptions = [];
+            } finally {
+                if (seq === this.filterClienteSearchSeq) {
+                    this.filterClienteSearchLoading = false;
+                }
             }
         },
 
         async searchFilterVeiculos(query: string, field: string) {
             this.filterVeiculoSearchSeq += 1;
             const seq = this.filterVeiculoSearchSeq;
+            this.filterVeiculoSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -722,6 +776,10 @@ export default defineComponent({
                 }
 
                 this.filterVeiculoOptions = [];
+            } finally {
+                if (seq === this.filterVeiculoSearchSeq) {
+                    this.filterVeiculoSearchLoading = false;
+                }
             }
         },
 
@@ -771,10 +829,12 @@ export default defineComponent({
                     os.statusOsId,
                     os.status?.nome || this.statusNameById[os.statusOsId] || "—"
                 ),
-                pagamentoBadge: osPagamentoBadge(
-                    os.pagamentoSituacao,
-                    formatDateBr(osDataLimitePagamento(os))
-                )
+                pagamentoBadge: os.statusOsId === 6
+                    ? { badge: { label: "—", color: "slate-500" } }
+                    : osPagamentoBadge(
+                        os.pagamentoSituacao ?? undefined,
+                        formatDateBr(osDataLimitePagamento(os))
+                    )
             };
         },
 
@@ -1114,9 +1174,11 @@ export default defineComponent({
             this.servicoSearchSeq += 1;
             const seq = this.servicoSearchSeq;
             const trimmed = query.trim();
+            this.servicoSearchLoading = true;
 
             if (!trimmed) {
                 this.servicoSuggestions = [];
+                this.servicoSearchLoading = false;
                 return;
             }
 
@@ -1140,6 +1202,10 @@ export default defineComponent({
                 }
 
                 this.servicoSuggestions = [];
+            } finally {
+                if (seq === this.servicoSearchSeq) {
+                    this.servicoSearchLoading = false;
+                }
             }
         },
 
@@ -1221,6 +1287,7 @@ export default defineComponent({
         async searchFormFuncionarios(query: string, field: string) {
             this.funcionarioSearchSeq += 1;
             const seq = this.funcionarioSearchSeq;
+            this.funcionarioSearchLoading = true;
 
             const selectedCpfs =
                 (this.osFormRef()?.getFieldValue("responsaveisCpfs") as string[] | undefined) ??
@@ -1262,12 +1329,17 @@ export default defineComponent({
                 this.formFuncionarios = next;
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os funcionários.");
+            } finally {
+                if (seq === this.funcionarioSearchSeq) {
+                    this.funcionarioSearchLoading = false;
+                }
             }
         },
 
         async searchFormClientes(query: string, field: string) {
             this.clienteSearchSeq += 1;
             const seq = this.clienteSearchSeq;
+            this.clienteSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -1296,6 +1368,10 @@ export default defineComponent({
                 );
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os clientes.");
+            } finally {
+                if (seq === this.clienteSearchSeq) {
+                    this.clienteSearchLoading = false;
+                }
             }
         },
 
@@ -1309,6 +1385,7 @@ export default defineComponent({
 
             this.veiculoSearchSeq += 1;
             const seq = this.veiculoSearchSeq;
+            this.veiculoSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -1341,6 +1418,10 @@ export default defineComponent({
                 );
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os veículos.");
+            } finally {
+                if (seq === this.veiculoSearchSeq) {
+                    this.veiculoSearchLoading = false;
+                }
             }
         },
 
@@ -1349,6 +1430,10 @@ export default defineComponent({
 
             if (existing) {
                 return existing;
+            }
+
+            if (!this.canCreateCliente) {
+                throw new Error("Selecione um cliente existente.");
             }
 
             const nome = payload.clienteNome.trim();
@@ -1534,11 +1619,13 @@ export default defineComponent({
 
                 const clienteDocumento = await this.resolveClienteDocumento(payload);
 
-                await this.syncClienteCelIfNeeded(clienteDocumento, payload.clienteCel);
+                if (this.canCreateCliente) {
+                    await this.syncClienteCelIfNeeded(clienteDocumento, payload.clienteCel);
+                }
 
                 const veiculoId = await this.resolveVeiculoId(payload, clienteDocumento);
 
-                if (this.dialogMode !== "create") {
+                if (this.dialogMode !== "create" && this.canCreateCliente) {
                     await this.syncVeiculoFieldsIfNeeded(veiculoId, payload);
                 }
 
@@ -1551,14 +1638,15 @@ export default defineComponent({
                     diagnosticoCliente: optionalTextForSave(payload.diagnosticoCliente, isCreate),
                     diagnosticoMecanico: optionalTextForSave(payload.diagnosticoMecanico, isCreate),
                     obs: optionalTextForSave(payload.obs, isCreate),
-                    dataInicio: optionalTextForSave(payload.dataInicio, isCreate),
-                    dataConclusao: optionalTextForSave(payload.dataConclusao, isCreate),
                     dataLimitePagamento: optionalTextForSave(payload.dataLimitePagamento, isCreate),
-                    itens: this.itensPayload(payload.itens),
-                    responsaveis: payload.responsaveisCpfs
-                        .map((cpf) => documentDigits(cpf))
-                        .filter((cpf) => Boolean(cpf) && cpf !== currentUsuarioCpfDigits())
+                    itens: this.itensPayload(payload.itens)
                 };
+
+                if (this.canAssignResponsaveis) {
+                    body.responsaveis = payload.responsaveisCpfs
+                        .map((cpf) => documentDigits(cpf))
+                        .filter((cpf) => Boolean(cpf) && cpf !== currentUsuarioCpfDigits());
+                }
 
                 if (this.dialogMode === "create" && this.dialogPagamentos.length > 0) {
                     body.pagamentos = this.pagamentosPayload(this.dialogPagamentos);

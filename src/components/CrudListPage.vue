@@ -43,6 +43,7 @@
                 :filters="filters"
                 :loading="loading"
                 :filter-select-options="filterSelectOptions"
+                :select-search-loading="filterSelectSearchLoading"
 
                 @filters="$emit('filters', $event)"
                 @reload="$emit('reload')"
@@ -166,6 +167,11 @@ export default defineComponent({
 
         filterSelectOptions: {
             type: Object as PropType<Record<string, OptionItem[]>>,
+            default: () => ({})
+        },
+
+        filterSelectSearchLoading: {
+            type: Object as PropType<Record<string, boolean>>,
             default: () => ({})
         },
 

@@ -92,6 +92,7 @@
                                         :options="servicoSelectOptions"
                                         :search="servicoSearch"
                                         :mobile-modal="false"
+                                        :external-search-loading="servicoSearchLoading"
 
                                         @keydown.enter="preventRowEnter"
                                         @update:query="onItemServicoNomeInput(index, $event)"
@@ -177,6 +178,7 @@
                                         :options="servicoSelectOptions"
                                         :search="servicoSearch"
                                         :mobile-modal="false"
+                                        :external-search-loading="servicoSearchLoading"
 
                                         @keydown.enter="onServicoEnter"
                                         @update:query="onServicoNomeInput"
@@ -390,6 +392,11 @@ export default defineComponent({
         servicoSuggestions: {
             type: Array as PropType<ServicoSuggestion[]>,
             default: () => []
+        },
+
+        servicoSearchLoading: {
+            type: Boolean,
+            default: false
         }
     },
 

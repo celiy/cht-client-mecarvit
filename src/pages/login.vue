@@ -19,7 +19,7 @@
                 <h4 class="text-xl font-semibold">Entrar</h4>
 
                 <p class="mb-2 text-sm text-muted-foreground!">
-                    Acesse com email e senha. Funcionários precisam selecionar a oficina.
+                    Acesse com email e senha. Se o mesmo login existir em mais de uma oficina, escolha a oficina.
                 </p>
             </template>
 
@@ -51,23 +51,7 @@
                         required
                     />
 
-                    <div
-                        v-if="loadingEmpresas"
-
-                        class="flex flex-col gap-2"
-                    >
-                        <Skeleton
-                            type="text"
-                            class="w-16"
-                        />
-
-                        <Skeleton
-                            type="card"
-                            class="h-11 w-full"
-                        />
-                    </div>
-
-                    <div v-else-if="empresaOptions.length > 0">
+                    <div v-if="empresaOptions.length > 1">
                         <Select
                             id="login-empresa"
                             v-model="empresaId"
@@ -96,8 +80,6 @@
                     />
 
                     <Button
-                        v-if="!loadingEmpresas"
-
                         label="Entrar"
                         variant="primary"
                         class="w-full"
@@ -106,8 +88,6 @@
                     />
 
                     <small
-                        v-if="!loadingEmpresas"
-
                         class="text-center text-sm"
                     >
                         Não tem conta?
@@ -132,6 +112,7 @@ import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 import { validateLogin } from "@shared/validators/auth";
 import logo from "../assets/logo.png";
 import { completeAuth, type AuthApiResponse, type EmpresaLocal } from "../js/auth";
+import type { ApiErrorResponse } from "@shared/errors/ApiError";
 
 export default defineComponent({
     name: "MecarvitLoginPage",
@@ -147,7 +128,6 @@ export default defineComponent({
             senha: "",
             empresaId: "" as string | number,
             empresas: [] as EmpresaLocal[],
-            loadingEmpresas: true,
             loading: false,
             formError: "",
             errors: {
@@ -164,30 +144,7 @@ export default defineComponent({
                 label: empresa.nome,
                 value: String(empresa.id)
             }));
-        },
-
-        backendReady(): boolean {
-            return this.$project.electron.backendReady;
         }
-    },
-
-    watch: {
-        /**
-         * In Electron the page mounts before the local backend starts
-         * listening, so the first request may be refused and the workshop list
-         * would stay empty forever. Retry once the backend reports ready.
-         */
-        backendReady(ready: boolean) {
-            if (!ready || this.empresas.length > 0) {
-                return;
-            }
-
-            void this.loadEmpresas();
-        }
-    },
-
-    mounted() {
-        void this.loadEmpresas();
     },
 
     methods: {
@@ -212,25 +169,18 @@ export default defineComponent({
             return id;
         },
 
-        async loadEmpresas() {
-            try {
-                const response = await this.$http.get<{ data: EmpresaLocal[] }>(
-                    "/api/empresa-locais"
-                );
-                this.empresas = response.data.data ?? [];
+        empresasFromError(error: HttpError): EmpresaLocal[] {
+            const data = error.data as ApiErrorResponse | undefined;
+            const empresas = data?.error?.empresas;
 
-                if (this.empresas.length === 1) {
-                    const only = this.empresas[0];
-
-                    if (only) {
-                        this.empresaId = String(only.id);
-                    }
-                }
-            } catch {
-                this.empresas = [];
-            } finally {
-                this.loadingEmpresas = false;
+            if (!Array.isArray(empresas)) {
+                return [];
             }
+
+            return empresas.filter(
+                (item): item is EmpresaLocal =>
+                    typeof item?.id === "number" && typeof item?.nome === "string"
+            );
         },
 
         async submit() {
@@ -269,7 +219,15 @@ export default defineComponent({
                 await completeAuth(this.$router, this.$route, response.data.data);
             } catch (error) {
                 if (error instanceof HttpError) {
-                    this.formError = error.message;
+                    const empresas = this.empresasFromError(error);
+
+                    if (empresas.length > 1) {
+                        this.empresas = empresas;
+                        this.formError = "Selecione a oficina para continuar.";
+                    } else {
+                        this.formError = error.message;
+                    }
+
                     this.errors.email = error.fields?.email ?? "";
                     this.errors.senha = error.fields?.senha ?? error.fields?.password ?? "";
                     this.errors.empresaId = error.fields?.empresaId ?? "";

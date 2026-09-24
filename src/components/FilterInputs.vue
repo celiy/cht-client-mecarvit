@@ -50,6 +50,7 @@
                         :search="filter.search"
                         :select-multiple="filter.multiple ? { min: 0 } : undefined"
                         :model-value="selectModelValue(filter)"
+                        :external-search-loading="Boolean(selectSearchLoading[filter.value])"
 
                         @update:value="onSelectValue(filter, $event)"
                         @search:external="onSelectSearch(filter, $event)"
@@ -155,8 +156,8 @@ export type FilterDef = FilterInputDef | FilterOptionDef | FilterSelectDef;
 export type FilterValues = Record<string, string>;
 
 type SelectOption = {
-    label: string;
-    value: string;
+    label?: string;
+    value?: string;
 };
 
 function isInputFilter(filter: FilterDef): filter is FilterInputDef {
@@ -197,6 +198,11 @@ export default defineComponent({
          */
         filterSelectOptions: {
             type: Object as PropType<Record<string, SelectOption[]>>,
+            default: () => ({})
+        },
+
+        selectSearchLoading: {
+            type: Object as PropType<Record<string, boolean>>,
             default: () => ({})
         }
     },

@@ -12,6 +12,7 @@
         :pagination-key="filters || 'all'"
         delete-name-field="modelo"
         :filter-select-options="filterSelectOptions"
+        :filter-select-search-loading="filterSelectSearchLoading"
         :show-create="canCreate"
         :show-export="canExport"
         :exporting="exporting"
@@ -154,6 +155,8 @@ export default defineComponent({
             formClientes: [] as ClienteApi[],
             filterClienteOptions: [] as Array<{ label: string; value: string }>,
             filterClienteSearchSeq: 0,
+            filterClienteSearchLoading: false,
+            clienteSearchLoading: false,
             loadingVeiculos: false,
             dialogOpen: false,
             dialogSaving: false,
@@ -215,6 +218,12 @@ export default defineComponent({
             };
         },
 
+        filterSelectSearchLoading(): Record<string, boolean> {
+            return {
+                clienteDocumento: this.filterClienteSearchLoading
+            };
+        },
+
         clienteNameByDocumento(): Record<string, string> {
             const map: Record<string, string> = {};
 
@@ -251,10 +260,21 @@ export default defineComponent({
         },
 
         dialogFields() {
-            return veiculoFormFields({
+            const fields = veiculoFormFields({
                 isCreate: this.dialogMode === "create",
                 clienteOptions: this.clienteOptions,
                 showCliente: true
+            });
+
+            return fields.map((field) => {
+                if (field.id !== "clienteDocumento") {
+                    return field;
+                }
+
+                return {
+                    ...field,
+                    selectSearchLoading: this.clienteSearchLoading
+                };
             });
         }
     },
@@ -302,6 +322,7 @@ export default defineComponent({
         async searchFilterClientes(query: string, field: string) {
             this.filterClienteSearchSeq += 1;
             const seq = this.filterClienteSearchSeq;
+            this.filterClienteSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -328,6 +349,10 @@ export default defineComponent({
                 }
 
                 this.filterClienteOptions = [];
+            } finally {
+                if (seq === this.filterClienteSearchSeq) {
+                    this.filterClienteSearchLoading = false;
+                }
             }
         },
 
@@ -350,6 +375,7 @@ export default defineComponent({
         async getClientes(query = "", field = "nome") {
             this.clienteSearchSeq += 1;
             const seq = this.clienteSearchSeq;
+            this.clienteSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -389,6 +415,10 @@ export default defineComponent({
                 }
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os clientes.");
+            } finally {
+                if (seq === this.clienteSearchSeq) {
+                    this.clienteSearchLoading = false;
+                }
             }
         },
 

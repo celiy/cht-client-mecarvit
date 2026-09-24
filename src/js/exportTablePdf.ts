@@ -2,6 +2,8 @@ import {
     formatTableCellMask,
     tableCellMaskForField
 } from "@shared/format/displayMasks";
+import { formatDateTimeBr } from "@shared/format/dateTime";
+import { mecarvit } from "./mecarvit";
 
 export type PdfTableColumn = {
     label: string;
@@ -167,7 +169,9 @@ function wrapText(text: string, maxChars: number): string[] {
 
 function slugify(value: string): string {
     return (
-        toWinAnsi(value)
+        value
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-|-$/g, "")
@@ -276,7 +280,18 @@ function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
     };
 
     pushText(page, MARGIN, y, TITLE_SIZE, fileTitle);
-    y -= TITLE_SIZE + 10;
+    y -= TITLE_SIZE + 6;
+
+    const companyName = mecarvit.company?.nome?.trim();
+    const exportedAt = formatDateTimeBr(new Date());
+    const headerLine = [companyName, exportedAt].filter(Boolean).join("  ·  ");
+
+    if (headerLine) {
+        pushText(page, MARGIN, y, FONT_SIZE, headerLine);
+        y -= LINE_HEIGHT + 8;
+    } else {
+        y -= 4;
+    }
 
     for (const table of tables) {
         const headers = table.headers.filter((header) => header.field);

@@ -440,6 +440,7 @@ export default defineComponent({
             dialogVehicles: [] as VeiculoApi[],
             allEnderecos: [] as EnderecoApi[],
             enderecoSearchSeq: 0,
+            enderecoSearchLoading: false,
             enderecoDialogOpen: false,
             enderecoSaving: false,
             enderecoDialogMode: "create" as DialogMode,
@@ -544,6 +545,15 @@ export default defineComponent({
                 enderecoOptions: this.enderecoOptions,
                 veiculoOptions: this.veiculoOptions,
                 includeVehicles: true
+            }).map((field) => {
+                if (field.id !== "enderecoIds") {
+                    return field;
+                }
+
+                return {
+                    ...field,
+                    selectSearchLoading: this.enderecoSearchLoading
+                };
             });
 
             if (this.dialogMode === "create" || this.canSeePii) {
@@ -1001,6 +1011,7 @@ export default defineComponent({
         async searchEnderecos(query = "", field = "rua") {
             this.enderecoSearchSeq += 1;
             const seq = this.enderecoSearchSeq;
+            this.enderecoSearchLoading = true;
 
             try {
                 const trimmed = query.trim();
@@ -1024,6 +1035,10 @@ export default defineComponent({
                 }
 
                 notifyHttpError(this.$toast, error, "Não foi possível buscar endereços.");
+            } finally {
+                if (seq === this.enderecoSearchSeq) {
+                    this.enderecoSearchLoading = false;
+                }
             }
         },
 

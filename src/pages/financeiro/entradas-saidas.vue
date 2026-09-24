@@ -30,6 +30,7 @@
                     <FilterInputs
                         :filters="entradaFilterDefs"
                         :filter-select-options="entradaOsFilterOptions"
+                        :select-search-loading="entradaSelectSearchLoading"
                         :loading="loadingEntradas"
 
                         @filters="onEntradaFilters"
@@ -263,7 +264,8 @@ import OrdemServicoForm, {
 } from "../../components/OrdemServicoForm.vue";
 import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
 import { formatDateBr, formatDateInputValue } from "@shared/format/dateTime";
-import { formatTableLabel } from "../../js/formatTableLabel";
+import { osPagamentoBadge } from "../../js/osStatusBadge";
+import { pagamentoSituacao } from "@shared/mecarvit/pagamentoSituacao";
 import { dateToInputValue, registroFormFields } from "../../js/entityFields";
 import PagamentosModal from "../../components/PagamentosModal.vue";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
@@ -476,11 +478,17 @@ export default defineComponent({
                 ordemServicoId: [] as Array<{ label: string; value: string }>
             },
             osFilterSearchSeq: 0,
+            osFilterSearchLoading: false,
             tableHeaders: [
                 { label: "Nome", field: "nome", position: "start" },
                 { label: "Valor", field: "valorLabel", position: "end" },
                 { label: "Pago", field: "pagoLabel", position: "end" },
-                { label: "Data limite", field: "dataLimiteLabel", position: "end" }
+                {
+                    label: "Pagamento",
+                    field: "pagamentoBadge",
+                    position: "center",
+                    badgeProps: { variantStyle: "bordered" }
+                }
             ] as TableHeader[],
             entradas: [] as RegistroApi[],
             saidas: [] as RegistroApi[],
@@ -532,6 +540,12 @@ export default defineComponent({
 
         canExport(): boolean {
             return currentCanExport("financeiro");
+        },
+
+        entradaSelectSearchLoading(): Record<string, boolean> {
+            return {
+                ordemServicoId: this.osFilterSearchLoading
+            };
         },
 
         rowActions() {
@@ -751,12 +765,21 @@ export default defineComponent({
         },
 
         toTableRow(row: RegistroApi) {
+            const valorPago = this.pagamentosValorFromApi(row.pagamentos);
+
             return {
                 ...row,
                 tipoLabel: tipoLabel(row.tipo),
                 valorLabel: formatMoneyBrl(row.valor),
-                pagoLabel: formatMoneyBrl(this.pagamentosValorFromApi(row.pagamentos)),
-                dataLimiteLabel: formatDateBr(row.dataLimitePagamento)
+                pagoLabel: formatMoneyBrl(valorPago),
+                pagamentoBadge: osPagamentoBadge(
+                    pagamentoSituacao({
+                        valor: Number(row.valor),
+                        valorPago,
+                        dataLimitePagamento: row.dataLimitePagamento
+                    }),
+                    formatDateBr(row.dataLimitePagamento)
+                )
             };
         },
 
@@ -847,6 +870,7 @@ export default defineComponent({
 
             this.osFilterSearchSeq += 1;
             const seq = this.osFilterSearchSeq;
+            this.osFilterSearchLoading = true;
             const trimmed = payload.value.trim();
             const query = toQueryString({
                 limit: 25,
@@ -874,6 +898,10 @@ export default defineComponent({
                 }
 
                 this.entradaOsFilterOptions = { ordemServicoId: [] };
+            } finally {
+                if (seq === this.osFilterSearchSeq) {
+                    this.osFilterSearchLoading = false;
+                }
             }
         },
 

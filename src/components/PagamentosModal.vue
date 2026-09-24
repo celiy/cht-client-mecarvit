@@ -356,12 +356,17 @@ export default defineComponent({
         },
 
         onApplyForm() {
+            const valorNum = parseMoneyInput(this.valor);
+
+            if (String(this.valor ?? "").trim() === "" || valorNum === null) {
+                this.onConfirm();
+                return;
+            }
+
             const tipoFinal = (this.tipo ?? "").toString().trim() || "pix";
             this.tipo = tipoFinal;
 
-            const valorNum = parseMoneyInput(this.valor);
-
-            if (!tipoFinal || valorNum === null || valorNum <= 0) {
+            if (!tipoFinal || valorNum <= 0) {
                 this.$toast.error("Informe o tipo e um valor maior que zero.");
 
                 return;

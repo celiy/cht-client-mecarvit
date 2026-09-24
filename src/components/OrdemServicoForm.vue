@@ -18,6 +18,8 @@
                     :search="clienteSearch"
                     :model-value="formValues.clienteDocumento"
                     :query="formValues.clienteNome"
+                    :disabled="lockCliente"
+                    :external-search-loading="clienteSearchLoading"
                     :error="fieldError('clienteDocumento') || fieldError('clienteNome')"
 
                     @update:value="onClienteSelect"
@@ -68,13 +70,14 @@
         </div>
 
         <Select
-            v-if="!isCoreReadonly && !isOrcamentoMode && !restrictedEdit"
+            v-if="!isCoreReadonly && !isOrcamentoMode && !restrictedEdit && canAssignResponsaveis"
 
             id="responsaveisCpfs"
             label="Funcionário(s) responsáve(l/is)"
             placeholder="Selecione um ou mais funcionários"
             :options="funcionarioSelectOptionsResolved"
             :search="funcionarioSearch"
+            :external-search-loading="funcionarioSearchLoading"
             :model-value="formValues.responsaveisCpfs"
             :select-multiple="{ min: 0 }"
             :error="fieldError('responsaveisCpfs')"
@@ -84,7 +87,7 @@
         />
 
         <div
-            v-else-if="isView && !restrictedEdit && responsaveisViewItems.length > 0"
+            v-else-if="isView && !restrictedEdit && canAssignResponsaveis && responsaveisViewItems.length > 0"
 
             class="flex flex-col gap-1.5"
         >
@@ -125,6 +128,7 @@
                     header="Modelo *"
                     :options="veiculoModeloOptions"
                     :search="veiculoSearch"
+                    :external-search-loading="veiculoSearchLoading"
                     :model-value="formValues.veiculoId"
                     :query="formValues.veiculoModelo"
                     :disabled="!canEditVeiculoFields"
@@ -236,48 +240,16 @@
                 :value="statusLabel"
             />
 
-            <div
-                v-if="!isOrcamentoMode && !restrictedEdit"
+            <Input
+                v-if="formValues.dataConclusao"
 
-                class="mt-3 grid gap-4 sm:grid-cols-2"
-            >
-                <Input
-                    id="dataInicio"
-                    type="date"
-                    label="Data de início"
-                    :variant="isView ? 'display' : 'secondary'"
-                    :readonly="isView"
-                    :value="formValues.dataInicio"
-                    :error="fieldError('dataInicio')"
-
-                    @update:value="updateValue('dataInicio', $event)"
-                />
-
-                <Input
-                    id="dataConclusao"
-                    type="date"
-                    label="Data de conclusão"
-                    :variant="isView ? 'display' : 'secondary'"
-                    :readonly="isView"
-                    :value="formValues.dataConclusao"
-                    :error="fieldError('dataConclusao')"
-
-                    @update:value="updateValue('dataConclusao', $event)"
-                />
-
-                <Input
-                    id="dataLimitePagamento"
-                    type="date"
-                    label="Data limite de pagamento"
-                    helper-text="Opcional. Prazo combinado com o cliente para o pagamento."
-                    :variant="isView ? 'display' : 'secondary'"
-                    :readonly="isView"
-                    :value="formValues.dataLimitePagamento"
-                    :error="fieldError('dataLimitePagamento')"
-
-                    @update:value="updateValue('dataLimitePagamento', $event)"
-                />
-            </div>
+                id="dataConclusao"
+                type="date"
+                label="Data de conclusão"
+                variant="display"
+                readonly
+                :value="formValues.dataConclusao"
+            />
         </div>
 
         <Marker separator />
@@ -286,8 +258,8 @@
             id="diagnosticoCliente"
             type="textarea"
             label="Diagnóstico do cliente"
-            :variant="isCoreReadonly ? 'display' : 'secondary'"
-            :readonly="isCoreReadonly"
+            :variant="isCoreReadonly || !canEditDiagnosticoCliente ? 'display' : 'secondary'"
+            :readonly="isCoreReadonly || !canEditDiagnosticoCliente"
             :value="formValues.diagnosticoCliente"
             :error="fieldError('diagnosticoCliente')"
 
@@ -314,6 +286,7 @@
             :mode="itensMode"
             :items="formValues.itens"
             :servico-suggestions="servicoSuggestions"
+            :servico-search-loading="servicoSearchLoading"
 
             @update:items="onItensChange"
             @search:servico="$emit('search:servico', $event)"
@@ -331,6 +304,21 @@
                     variant="display"
                     readonly
                     :value="totalsDisplay.total"
+                />
+
+                <Input
+                    v-if="!isOrcamentoMode"
+
+                    id="dataLimitePagamento"
+                    type="date"
+                    label="Data limite de pagamento"
+                    helper-text="Opcional. Prazo combinado com o cliente para o pagamento."
+                    :variant="isView ? 'display' : 'secondary'"
+                    :readonly="isView || restrictedEdit"
+                    :value="formValues.dataLimitePagamento"
+                    :error="fieldError('dataLimitePagamento')"
+
+                    @update:value="updateValue('dataLimitePagamento', $event)"
                 />
 
                 <div
@@ -571,6 +559,46 @@ export default defineComponent({
             default: true
         },
 
+        canCreateCliente: {
+            type: Boolean,
+            default: true
+        },
+
+        lockCliente: {
+            type: Boolean,
+            default: false
+        },
+
+        canAssignResponsaveis: {
+            type: Boolean,
+            default: true
+        },
+
+        canEditDiagnosticoCliente: {
+            type: Boolean,
+            default: true
+        },
+
+        clienteSearchLoading: {
+            type: Boolean,
+            default: false
+        },
+
+        veiculoSearchLoading: {
+            type: Boolean,
+            default: false
+        },
+
+        funcionarioSearchLoading: {
+            type: Boolean,
+            default: false
+        },
+
+        servicoSearchLoading: {
+            type: Boolean,
+            default: false
+        },
+
         values: {
             type: Object as PropType<OrdemServicoFormValues>,
             required: true
@@ -736,7 +764,7 @@ export default defineComponent({
         },
 
         showClienteCpfField(): boolean {
-            if (this.isCoreReadonly || !this.canSeeClientePii) {
+            if (this.isCoreReadonly || !this.canSeeClientePii || !this.canCreateCliente) {
                 return false;
             }
 
