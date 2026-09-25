@@ -223,6 +223,9 @@ export default defineComponent({
                     if (empresas.length > 1) {
                         this.empresas = empresas;
                         this.errors.empresaId = empresaId === undefined ? "Selecione a oficina" : "";
+                        this.$toast.warning(
+                            "Este login existe em mais de uma oficina. Selecione a oficina desejada e entre novamente."
+                        );
                     } else {
                         this.formError = error.message;
                         this.errors.empresaId = error.fields?.empresaId ?? "";

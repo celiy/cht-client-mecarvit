@@ -94,8 +94,6 @@
 
             <RouterView />
         </Sidebar>
-
-        <Toast position="bottom" />
     </main>
 </template>
 

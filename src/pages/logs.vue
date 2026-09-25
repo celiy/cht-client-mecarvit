@@ -37,7 +37,7 @@
                         v-model="detailView"
                         label="Visualização"
                         label-position="center"
-                        toggle-position="center"
+                        toggleable-position="center"
                         size="small"
                         :options="detailViewOptions"
                     />
@@ -408,7 +408,11 @@ export default defineComponent({
                     result: entry.result === "success" ? "Sucesso" : "Falha",
                     _raw: entry
                 }));
-                this.pageCount = pageCountFromTotal(payload.total ?? 0, this.pageLimit);
+                this.pageCount = pageCountFromTotal(
+                    payload.total ?? 0,
+                    this.pageLimit,
+                    this.pageLimit
+                );
             } catch (error) {
                 notifyHttpError(this.$toast, error, "Não foi possível carregar os logs.");
                 this.tableRows = [];

@@ -2,6 +2,7 @@
     <ElectronStartupGate>
         <RouterView />
         <DevToolsExample />
+        <Toast position="bottom" />
     </ElectronStartupGate>
 </template>
 
