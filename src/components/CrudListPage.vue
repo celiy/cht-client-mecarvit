@@ -60,6 +60,7 @@
                     :loading="loading"
 
                     @click:action="onRowAction"
+                    @sort:field="$emit('sort', $event)"
                 >
                     <template #empty>
                         <EmptyTableMessage
@@ -121,6 +122,7 @@ export type TableHeader = {
     position?: "start" | "center" | "end";
     format?: TableCellMaskFormat;
     badgeProps?: TableHeaderBadgeProps;
+    canSort?: boolean;
 };
 
 export default defineComponent({
@@ -235,7 +237,8 @@ export default defineComponent({
         "action",
         "delete",
         "search:external",
-        "export"
+        "export",
+        "sort"
     ],
 
     data() {

@@ -1,6 +1,7 @@
 <template>
     <CrudListPage
         ref="listPage"
+
         title="Ordens de serviço"
         :filters="osFilters"
         :loading="loadingOs"
@@ -27,6 +28,7 @@
         @action="onRowAction"
         @delete="onDelete"
         @export="onExport"
+        @sort="onSort"
     >
         <template
             v-if="canCreate"
@@ -51,6 +53,7 @@
         </template>
         <Modal
             ref="osModal"
+
             :is-open="dialogOpen"
             size="extra-large"
 
@@ -102,6 +105,22 @@
 
             <template #footer>
                 <div class="flex flex-wrap justify-end gap-2">
+                    <Button
+                        v-if="canExportDialogOs"
+
+                        v-tooltip="'Exportar esta OS para PDF'"
+                        variant="secondary"
+                        type="button"
+                        class="mr-auto"
+                        aria-label="Exportar esta OS para PDF"
+                        :disabled="exportingOs || dialogSaving || paymentModalOpen"
+
+                        @click="onExportDialogOs"
+                    >
+                        <span class="fa-solid fa-file-pdf text-xs" />
+                        <span class="ml-2">Exportar PDF</span>
+                    </Button>
+
                     <template v-if="dialogMode === 'view'">
                         <Button
                             variant="primary"
@@ -162,6 +181,7 @@ import type { PagamentoFormRow } from "../../js/pagamentoOptions";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
 import OrdemServicoForm, {
     emptyOrdemServicoFormValues,
+    mergeOrdemServicoFormValues,
     type OrdemServicoFormValues,
     type VeiculoSelectOption
 } from "../../components/OrdemServicoForm.vue";
@@ -169,7 +189,11 @@ import { clienteNomeSocialForSave, optionalTextForSave } from "../../js/entityFi
 import { digitsOnly } from "@shared/validators/mecarvit";
 import { parseMoneyInput } from "@shared/format/moneyInput";
 import type { OrdemServicoItemFormRow } from "../../components/OrdemServicoItensSection.vue";
-import { toOsForm, osDataLimitePagamento, type OrdemServicoApi } from "../../js/ordemServicoFormMap";
+import {
+    toOsForm,
+    osDataLimitePagamento,
+    type OrdemServicoApi
+} from "../../js/ordemServicoFormMap";
 import {
     documentDigits,
     fetchAllList,
@@ -183,6 +207,7 @@ import {
     type ItemResponse,
     type ListResponse
 } from "../../js/crudHttp";
+import { toSortQuery, type SortFieldPayload } from "../../js/sortTableRows";
 import type { OptionItem } from "@design/components/internal/OptionsList.vue";
 import { formatTableLabel } from "../../js/formatTableLabel";
 import { osPagamentoBadge, osStatusBadge, osStatusIndicator } from "../../js/osStatusBadge";
@@ -198,6 +223,7 @@ import {
 } from "../../js/mecarvit";
 import { PERMISSIONS } from "@shared/mecarvit/access";
 import { downloadTablePdf } from "../../js/exportTablePdf";
+import { downloadOsPdf } from "../../js/exportOsPdf";
 
 const OS_STATUS_ACTION_PREFIX = "status:";
 
@@ -213,10 +239,10 @@ function buildOsRowActions(
     const statusOptions: OptionItem[] = statusList
         .filter((status) => status.id !== 6)
         .map((status) => ({
-        label: formatTableLabel(status.nome),
-        value: `${OS_STATUS_ACTION_PREFIX}${status.id}`,
-        indicator: osStatusIndicator(status.id)
-    }));
+            label: formatTableLabel(status.nome),
+            value: `${OS_STATUS_ACTION_PREFIX}${status.id}`,
+            indicator: osStatusIndicator(status.id)
+        }));
 
     const actions: OptionItem[] = [
         { label: "Visualizar", value: "inspect", icon: "fa-eye" },
@@ -322,20 +348,22 @@ export default defineComponent({
             osFormId: "ordem-servico-form",
             filters: "",
             tableHeaders: [
-                { label: "OS", field: "idLabel", position: "start" },
-                { label: "Cliente", field: "clienteNome", position: "start" },
-                { label: "Veículo", field: "veiculoLabel", position: "start" },
+                { label: "OS", field: "idLabel", position: "start", canSort: true },
+                { label: "Cliente", field: "clienteNome", position: "start", canSort: true },
+                { label: "Veículo", field: "veiculoLabel", position: "start", canSort: true },
                 {
                     label: "Status",
                     field: "statusBadge",
                     position: "center",
-                    badgeProps: { variantStyle: "bordered" }
+                    badgeProps: { variantStyle: "bordered" },
+                    canSort: true
                 },
                 {
                     label: "Pagamento",
                     field: "pagamentoBadge",
                     position: "center",
-                    badgeProps: { variantStyle: "bordered" }
+                    badgeProps: { variantStyle: "bordered" },
+                    canSort: true
                 }
             ] as TableHeader[],
             ordens: [] as OrdemServicoApi[],
@@ -368,9 +396,11 @@ export default defineComponent({
             filterClienteSearchSeq: 0,
             filterVeiculoSearchSeq: 0,
             page: 1,
+            sort: "",
             pageLimit: 10,
             pageCount: 0,
-            exporting: false
+            exporting: false,
+            exportingOs: false
         };
     },
 
@@ -383,13 +413,19 @@ export default defineComponent({
             return currentCanExport("os");
         },
 
+        canExportDialogOs(): boolean {
+            return this.canExport && this.dialogOpen && this.dialogItem.id != null;
+        },
+
         canSeeClientePii(): boolean {
             return currentCanSeePii("clientes");
         },
 
         canSeePagamentos(): boolean {
-            return currentHasPermission(PERMISSIONS.financeiro.editar)
-                || currentCanCreate("financeiro");
+            return (
+                currentHasPermission(PERMISSIONS.financeiro.editar) ||
+                currentCanCreate("financeiro")
+            );
         },
 
         filterSelectSearchLoading(): Record<string, boolean> {
@@ -440,8 +476,8 @@ export default defineComponent({
                 canCreate: this.canCreate,
                 canDelete: currentCanDelete("os"),
                 canSeePagamentos:
-                    currentHasPermission(PERMISSIONS.financeiro.editar)
-                    || currentCanCreate("financeiro"),
+                    currentHasPermission(PERMISSIONS.financeiro.editar) ||
+                    currentCanCreate("financeiro"),
                 canChangeStatus: this.canChangeOsStatus
             });
         },
@@ -488,13 +524,15 @@ export default defineComponent({
                     ]
                 },
                 ...(this.canSeePagamentos
-                    ? [{
-                        type: "input" as const,
-                        value: "dataLimitePagamento",
-                        label: "Data pagamento",
-                        inputType: "date" as const,
-                        helperText: "Filtrar pela data de pagamento"
-                    }]
+                    ? [
+                          {
+                              type: "input" as const,
+                              value: "dataLimitePagamento",
+                              label: "Data pagamento",
+                              inputType: "date" as const,
+                              helperText: "Filtrar pela data de pagamento"
+                          }
+                      ]
                     : [])
             ];
         },
@@ -648,6 +686,12 @@ export default defineComponent({
             if (!open) {
                 void this.listPage()?.clearCadastrarQuery?.();
             }
+        },
+
+        onSort(payload: SortFieldPayload) {
+            this.page = 1;
+            this.sort = toSortQuery(payload);
+            void this.getOrdens();
         },
 
         onFilters(values: FilterValues) {
@@ -818,7 +862,7 @@ export default defineComponent({
             try {
                 this.loadingOs = true;
 
-                const query = listQuery(this.filters, this.page, this.pageLimit);
+                const query = listQuery(this.filters, this.page, this.pageLimit, this.sort);
                 const response = await this.$http.get<ListResponse<OrdemServicoApi>>(
                     `/api/ordem-servico?${query}`
                 );
@@ -849,10 +893,10 @@ export default defineComponent({
                 ...os,
                 idLabel: `#${os.id}`,
                 clienteNome:
-                    this.clienteNameByDocumento[os.clienteDocumento]
-                    || os.clienteNome
-                    || os.cliente?.nome
-                    || os.clienteDocumento,
+                    this.clienteNameByDocumento[os.clienteDocumento] ||
+                    os.clienteNome ||
+                    os.cliente?.nome ||
+                    os.clienteDocumento,
                 veiculoLabel: veiculo
                     ? `${veiculo.modelo} · ${veiculo.placa}`
                     : String(os.veiculoId),
@@ -860,12 +904,13 @@ export default defineComponent({
                     os.statusOsId,
                     os.status?.nome || this.statusNameById[os.statusOsId] || "—"
                 ),
-                pagamentoBadge: os.statusOsId === 6
-                    ? { badge: { label: "—", color: "slate-500" } }
-                    : osPagamentoBadge(
-                        os.pagamentoSituacao ?? undefined,
-                        this.canSeePagamentos ? formatDateBr(osDataLimitePagamento(os)) : ""
-                    )
+                pagamentoBadge:
+                    os.statusOsId === 6
+                        ? { badge: { label: "—", color: "slate-500" } }
+                        : osPagamentoBadge(
+                              os.pagamentoSituacao ?? undefined,
+                              this.canSeePagamentos ? formatDateBr(osDataLimitePagamento(os)) : ""
+                          )
             };
         },
 
@@ -876,7 +921,8 @@ export default defineComponent({
                 const rows = await fetchAllList<OrdemServicoApi>(
                     this.$http.get.bind(this.$http),
                     "/api/ordem-servico",
-                    this.filters
+                    this.filters,
+                    this.sort
                 );
                 downloadTablePdf(
                     "Ordens de serviço",
@@ -887,6 +933,88 @@ export default defineComponent({
                 notifyHttpError(this.$toast, error, "Não foi possível exportar a tabela.");
             } finally {
                 this.exporting = false;
+            }
+        },
+
+        dialogValuesForExport(): OrdemServicoFormValues {
+            const form = this.osFormRef();
+
+            if (!form) {
+                return this.dialogItem;
+            }
+
+            const keys: Array<keyof OrdemServicoFormValues> = [
+                "id",
+                "clienteDocumento",
+                "clienteNome",
+                "clienteCel",
+                "veiculoId",
+                "veiculoModelo",
+                "veiculoPlaca",
+                "veiculoKilometragem",
+                "veiculoTipo",
+                "statusOsId",
+                "dataInicio",
+                "dataConclusao",
+                "dataLimitePagamento",
+                "diagnosticoCliente",
+                "diagnosticoMecanico",
+                "obs",
+                "responsaveisCpfs",
+                "itens",
+                "criadoEm",
+                "modificadoEm"
+            ];
+            const patch: Partial<OrdemServicoFormValues> = { ...this.dialogItem };
+
+            for (const key of keys) {
+                const value = form.getFieldValue(key);
+
+                if (value !== undefined) {
+                    (patch as Record<string, unknown>)[key] = value;
+                }
+            }
+
+            return mergeOrdemServicoFormValues(patch);
+        },
+
+        onExportDialogOs() {
+            if (!this.canExportDialogOs || this.exportingOs) {
+                return;
+            }
+
+            this.exportingOs = true;
+
+            try {
+                const values = this.dialogValuesForExport();
+                const statusId = Number(values.statusOsId);
+                const statusLabel =
+                    this.statusNameById[statusId] ||
+                    this.statusOs.find((entry) => entry.id === statusId)?.nome ||
+                    String(values.statusOsId || "—");
+                const responsaveisLabels = (values.responsaveisCpfs ?? [])
+                    .map((cpf) => {
+                        const digits = documentDigits(cpf);
+                        const found = this.formFuncionarios.find(
+                            (usuario) => documentDigits(usuario.cpf) === digits
+                        );
+
+                        return found?.nome || digits;
+                    })
+                    .filter(Boolean);
+
+                downloadOsPdf({
+                    values,
+                    statusLabel,
+                    responsaveisLabels,
+                    pagamentos: this.dialogPagamentos,
+                    includeClientePii: this.canSeeClientePii,
+                    includePagamentos: this.canSeePagamentos && statusId !== 6
+                });
+            } catch (error) {
+                notifyHttpError(this.$toast, error, "Não foi possível exportar a OS.");
+            } finally {
+                this.exportingOs = false;
             }
         },
 
@@ -1034,9 +1162,12 @@ export default defineComponent({
             const statusName = formatTableLabel(this.statusNameById[statusOsId] ?? "Status");
 
             try {
-                await this.$http.patch<ItemResponse<OrdemServicoApi>>(`/api/ordem-servico/${osId}`, {
-                    statusOsId
-                });
+                await this.$http.patch<ItemResponse<OrdemServicoApi>>(
+                    `/api/ordem-servico/${osId}`,
+                    {
+                        statusOsId
+                    }
+                );
                 this.$toast.success(`Status alterado para ${statusName}.`);
                 await this.getOrdens();
 
@@ -1111,8 +1242,7 @@ export default defineComponent({
         },
 
         openDialogOsPagamentos() {
-            this.paymentReadonly =
-                this.dialogMode === "view" || this.dialogItem.statusOsId === "5";
+            this.paymentReadonly = this.dialogMode === "view" || this.dialogItem.statusOsId === "5";
             this.paymentFromDialog = true;
             this.paymentModalRows = [...this.dialogPagamentos];
             this.paymentValorTotal = this.osValorTotalFromForm();
@@ -1652,7 +1782,10 @@ export default defineComponent({
                     const id = Number(this.dialogItem.id);
 
                     await this.$http.patch(`/api/ordem-servico/${id}`, {
-                        diagnosticoMecanico: optionalTextForSave(payload.diagnosticoMecanico, false),
+                        diagnosticoMecanico: optionalTextForSave(
+                            payload.diagnosticoMecanico,
+                            false
+                        ),
                         obs: optionalTextForSave(payload.obs, false),
                         itens: this.itensPayload(payload.itens)
                     });
@@ -1679,9 +1812,8 @@ export default defineComponent({
                 const body: Record<string, unknown> = {
                     clienteDocumento,
                     veiculoId,
-                    statusOsId: isCreate || this.canChangeOsStatus
-                        ? Number(payload.statusOsId)
-                        : undefined,
+                    statusOsId:
+                        isCreate || this.canChangeOsStatus ? Number(payload.statusOsId) : undefined,
                     diagnosticoCliente: this.canEditDiagnosticoCliente
                         ? optionalTextForSave(payload.diagnosticoCliente, isCreate)
                         : undefined,

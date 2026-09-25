@@ -28,6 +28,7 @@
         @delete="onDelete"
         @search:external="onFilterSearch"
         @export="onExport"
+        @sort="onSort"
     >
         <ItemViewEdit
             ref="itemDialog"
@@ -73,6 +74,7 @@ import {
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
+import { toSortQuery, type SortFieldPayload } from "../../js/sortTableRows";
 import { currentCanCreate, currentCanDelete, currentCanExport } from "../../js/mecarvit";
 import { downloadTablePdf } from "../../js/exportTablePdf";
 
@@ -147,9 +149,9 @@ export default defineComponent({
         return {
             filters: "",
             tableHeaders: [
-                { label: "Modelo", field: "modelo", position: "start" },
-                { label: "Placa", field: "placa", position: "start" },
-                { label: "Cliente", field: "clienteNome", position: "start" }
+                { label: "Modelo", field: "modelo", position: "start", canSort: true },
+                { label: "Placa", field: "placa", position: "start", canSort: true },
+                { label: "Cliente", field: "clienteNome", position: "start", canSort: true }
             ] as TableHeader[],
             veiculos: [] as VeiculoApi[],
             clientes: [] as ClienteApi[],
@@ -167,6 +169,7 @@ export default defineComponent({
             dialogKey: 0,
             clienteSearchSeq: 0,
             page: 1,
+            sort: "",
             pageLimit: 10,
             pageCount: 0,
             exporting: false
@@ -312,6 +315,13 @@ export default defineComponent({
             this.dialogMode = mode;
         },
 
+        
+        onSort(payload: SortFieldPayload) {
+            this.page = 1;
+            this.sort = toSortQuery(payload);
+            void this.getVeiculos();
+        },
+
         onFilters(values: FilterValues) {
             this.page = 1;
             this.filters = toQueryString(values);
@@ -431,7 +441,7 @@ export default defineComponent({
             try {
                 this.loadingVeiculos = true;
 
-                const query = listQuery(this.filters, this.page, this.pageLimit);
+                const query = listQuery(this.filters, this.page, this.pageLimit, this.sort);
                 const response = await this.$http.get<ListResponse<VeiculoApi>>(
                     `/api/veiculo?${query}`
                 );
@@ -458,7 +468,8 @@ export default defineComponent({
                 const rows = await fetchAllList<VeiculoApi>(
                     this.$http.get.bind(this.$http),
                     "/api/veiculo",
-                    this.filters
+                    this.filters,
+                    this.sort
                 );
                 const mapped = rows.map((veiculo) => ({
                     ...veiculo,

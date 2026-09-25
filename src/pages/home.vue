@@ -1,11 +1,16 @@
 <template>
     <main class="flex max-w-2xl flex-col gap-6 p-8">
         <section>
-            <h1 class="text-2xl font-semibold">Home</h1>
+            <h2 class="mb-2!">Dashboard</h2>
 
-            <p class="mt-2 text-muted-foreground!">
-                Área autenticada do {{ $project.labels.siteTitle }}.
-            </p>
+            <Tabs>
+                <template #tab-title-0>Entradas e Saídas</template>
+                <template #tab-title-1>Ordens de Serviço</template>
+
+                <template #tab-content-0> </template>
+
+                <template #tab-content-1> </template>
+            </Tabs>
         </section>
     </main>
 </template>

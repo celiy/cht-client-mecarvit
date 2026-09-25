@@ -88,10 +88,11 @@ export function notifyHttpError(
     toast.error(fallback);
 }
 
-export function listQuery(filters: string, page: number, limit: number): string {
+export function listQuery(filters: string, page: number, limit: number, sort = ""): string {
     const paging = toQueryString({
         page,
-        limit
+        limit,
+        ...(sort ? { sort } : {})
     });
 
     return [filters, paging].filter(Boolean).join("&");
@@ -103,16 +104,17 @@ type ListGet = <T>(url: string) => Promise<{ data: ListResponse<T> }>;
 export async function fetchAllList<T>(
     get: ListGet,
     path: string,
-    filters: string
+    filters: string,
+    sort = ""
 ): Promise<T[]> {
-    const first = await get<T>(`${path}?${listQuery(filters, 1, 1)}`);
+    const first = await get<T>(`${path}?${listQuery(filters, 1, 1, sort)}`);
     const total = Number(first.data.total ?? first.data.data?.length ?? 0);
 
     if (total <= 1) {
         return first.data.data ?? [];
     }
 
-    const all = await get<T>(`${path}?${listQuery(filters, 1, total)}`);
+    const all = await get<T>(`${path}?${listQuery(filters, 1, total, sort)}`);
 
     return all.data.data ?? [];
 }

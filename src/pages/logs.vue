@@ -18,6 +18,7 @@
         @reload="loadLogs"
         @page="onPage"
         @action="onRowAction"
+        @sort="onSort"
     >
         <Modal
             :is-open="detailOpen"
@@ -171,6 +172,7 @@ import CrudListPage, { type TableHeader } from "../components/CrudListPage.vue";
 import Modal from "@design/components/Modal.vue";
 import Toggleable from "@design/components/Toggleable.vue";
 import { notifyHttpError, pageCountFromTotal, type ListResponse } from "../js/crudHttp";
+import { toSortQuery, type SortFieldPayload } from "../js/sortTableRows";
 
 type AuditActor = {
     type: "user" | "system";
@@ -245,6 +247,7 @@ export default defineComponent({
             page: 1,
             pageLimit: 20,
             pageCount: 1,
+            sort: "",
             filterValues: {} as FilterValues,
             filtersKey: "all",
             tableRows: [] as AuditRow[],
@@ -257,12 +260,12 @@ export default defineComponent({
             ],
             rowActions: [{ label: "Visualizar", value: "inspect", icon: "fa-eye" }],
             tableHeaders: [
-                { label: "Data", field: "occurredAt", position: "start" },
-                { label: "Autor", field: "actor", position: "start" },
-                { label: "Ação", field: "action", position: "start" },
-                { label: "Entidade", field: "entity", position: "start" },
-                { label: "ID", field: "entityId", position: "start" },
-                { label: "Resultado", field: "result", position: "start" }
+                { label: "Data", field: "occurredAt", position: "start", canSort: true },
+                { label: "Autor", field: "actor", position: "start", canSort: true },
+                { label: "Ação", field: "action", position: "start", canSort: true },
+                { label: "Entidade", field: "entity", position: "start", canSort: true },
+                { label: "ID", field: "entityId", position: "start", canSort: true },
+                { label: "Resultado", field: "result", position: "start", canSort: true }
             ] as TableHeader[],
             logFilters: [
                 {
@@ -372,6 +375,12 @@ export default defineComponent({
             void this.loadLogs();
         },
 
+        onSort(payload: SortFieldPayload) {
+            this.page = 1;
+            this.sort = toSortQuery(payload);
+            void this.loadLogs();
+        },
+
         onPage(page: number) {
             this.page = page;
             void this.loadLogs();
@@ -385,6 +394,10 @@ export default defineComponent({
                     page: this.page,
                     limit: this.pageLimit
                 };
+
+                if (this.sort) {
+                    params.sort = this.sort;
+                }
 
                 for (const [key, value] of Object.entries(this.filterValues)) {
                     if (value) {

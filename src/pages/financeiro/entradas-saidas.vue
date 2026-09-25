@@ -62,6 +62,7 @@
                     :loading="loadingEntradas"
 
                     @click:action="onSectionAction"
+                    @sort:field="onEntradaSort"
                 >
                     <template #empty>
                         <EmptyTableMessage
@@ -129,6 +130,7 @@
                     :loading="loadingSaidas"
 
                     @click:action="onSectionAction"
+                    @sort:field="onSaidaSort"
                 >
                     <template #empty>
                         <EmptyTableMessage
@@ -317,6 +319,7 @@ import {
     type ListResponse
 } from "../../js/crudHttp";
 import { currentCanCreate, currentCanDelete, currentCanExport, excludeCurrentUsuario } from "../../js/mecarvit";
+import { toSortQuery, type SortFieldPayload } from "../../js/sortTableRows";
 import { downloadTablesPdf } from "../../js/exportTablePdf";
 import { formatTableLabel } from "../../js/formatTableLabel";
 
@@ -511,18 +514,21 @@ export default defineComponent({
             osFilterSearchSeq: 0,
             osFilterSearchLoading: false,
             tableHeaders: [
-                { label: "Nome", field: "nome", position: "start" },
-                { label: "Valor", field: "valorLabel", position: "end" },
-                { label: "Pago", field: "pagoLabel", position: "end" },
+                { label: "Nome", field: "nome", position: "start", canSort: true },
+                { label: "Valor", field: "valorLabel", position: "end", canSort: true },
+                { label: "Pago", field: "pagoLabel", position: "end", canSort: true },
                 {
                     label: "Pagamento",
                     field: "pagamentoBadge",
                     position: "center",
-                    badgeProps: { variantStyle: "bordered" }
+                    badgeProps: { variantStyle: "bordered" },
+                    canSort: true
                 }
             ] as TableHeader[],
             entradas: [] as RegistroApi[],
             saidas: [] as RegistroApi[],
+            entradaSort: "",
+            saidaSort: "",
             loadingEntradas: false,
             loadingSaidas: false,
             entradaFilters: "",
@@ -1185,6 +1191,18 @@ export default defineComponent({
             void this.getSaidas();
         },
 
+        onEntradaSort(payload: SortFieldPayload) {
+            this.entradaPage = 1;
+            this.entradaSort = toSortQuery(payload);
+            void this.getEntradas();
+        },
+
+        onSaidaSort(payload: SortFieldPayload) {
+            this.saidaPage = 1;
+            this.saidaSort = toSortQuery(payload);
+            void this.getSaidas();
+        },
+
         onEntradaPage(page: number) {
             if (page === this.entradaPage) {
                 return;
@@ -1293,7 +1311,8 @@ export default defineComponent({
             const query = listQuery(
                 [filters, tipoQuery].filter(Boolean).join("&"),
                 page,
-                this.pageLimit
+                this.pageLimit,
+                isEntrada ? this.entradaSort : this.saidaSort
             );
 
             try {

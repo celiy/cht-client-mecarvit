@@ -26,6 +26,7 @@
         @action="onRowAction"
         @delete="onDelete"
         @export="onExport"
+        @sort="onSort"
     >
         <ItemViewEdit
             ref="itemDialog"
@@ -260,6 +261,7 @@ import {
     type ListResponse,
     withSelectedItem
 } from "../../js/crudHttp";
+import { toSortQuery, type SortFieldPayload } from "../../js/sortTableRows";
 import {
     currentCanCreate,
     currentCanDelete,
@@ -430,9 +432,9 @@ export default defineComponent({
                 { type: "input", value: "cel", label: "Celular", inputType: "phone" }
             ] as FilterDef[],
             tableHeadersBase: [
-                { label: "Nome", field: "nome", position: "start" },
-                { label: "Documento", field: "documento", position: "start" },
-                { label: "Celular", field: "cel", position: "start" }
+                { label: "Nome", field: "nome", position: "start", canSort: true },
+                { label: "Documento", field: "documento", position: "start", canSort: true },
+                { label: "Celular", field: "cel", position: "start", canSort: true }
             ] as TableHeader[],
             clientes: [] as ClienteApi[],
             loadingClientes: false,
@@ -461,6 +463,7 @@ export default defineComponent({
             veiculoDialogKey: 0,
             pendingVeiculoSeq: 0,
             page: 1,
+            sort: "",
             pageLimit: 10,
             pageCount: 0,
             clienteOrdens: [] as OrdemServicoApi[],
@@ -923,6 +926,13 @@ export default defineComponent({
             this.editingVeiculoId = null;
         },
 
+        
+        onSort(payload: SortFieldPayload) {
+            this.page = 1;
+            this.sort = toSortQuery(payload);
+            void this.getClientes();
+        },
+
         onFilters(values: FilterValues) {
             this.page = 1;
             this.filters = toQueryString(values);
@@ -942,7 +952,7 @@ export default defineComponent({
             try {
                 this.loadingClientes = true;
 
-                const query = listQuery(this.filters, this.page, this.pageLimit);
+                const query = listQuery(this.filters, this.page, this.pageLimit, this.sort);
                 const response = await this.$http.get<ListResponse<ClienteApi>>(
                     `/api/cliente?${query}`
                 );
@@ -969,7 +979,8 @@ export default defineComponent({
                 const rows = await fetchAllList<ClienteApi>(
                     this.$http.get.bind(this.$http),
                     "/api/cliente",
-                    this.filters
+                    this.filters,
+                    this.sort
                 );
                 downloadTablePdf(
                     "Clientes",
