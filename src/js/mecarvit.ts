@@ -116,7 +116,7 @@ export function currentIsSuperadmin(): boolean {
     return isUsuarioSuperadmin(mecarvit.user ?? {});
 }
 
-function currentIsGerente(): boolean {
+export function currentIsGerente(): boolean {
     return hasPermission(currentNivelAcesso(), PERMISSIONS.GERENTE) || currentIsSuperadmin();
 }
 

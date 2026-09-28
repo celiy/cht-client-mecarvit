@@ -16,8 +16,15 @@ export type PdfTable = {
     rows: Array<Record<string, unknown>>;
 };
 
-const PAGE_WIDTH = 841.89;
-const PAGE_HEIGHT = 595.28;
+export const A4_LANDSCAPE = { width: 841.89, height: 595.28 } as const;
+export const A4_PORTRAIT = { width: 595.28, height: 841.89 } as const;
+
+export type PdfPageSize = { width: number; height: number };
+export type PdfPageBuffer = string[];
+export type PdfFont = "F1" | "F2";
+
+const PAGE_WIDTH = A4_LANDSCAPE.width;
+const PAGE_HEIGHT = A4_LANDSCAPE.height;
 const MARGIN = 36;
 const FONT_SIZE = 9;
 const TITLE_SIZE = 14;
@@ -179,28 +186,56 @@ function slugify(value: string): string {
     );
 }
 
-type PageBuffer = string[];
-
-function beginPage(): PageBuffer {
+export function beginPdfPage(): PdfPageBuffer {
     return [];
 }
 
-function pushText(page: PageBuffer, x: number, y: number, size: number, text: string) {
+export function pdfText(
+    page: PdfPageBuffer,
+    x: number,
+    y: number,
+    size: number,
+    text: string,
+    font: PdfFont = "F1"
+) {
     page.push(
         "BT",
-        `/F1 ${size} Tf`,
+        `/${font} ${size} Tf`,
         `1 0 0 1 ${x.toFixed(2)} ${y.toFixed(2)} Tm`,
         `${pdfLiteral(text)} Tj`,
         "ET"
     );
 }
 
-function pushRect(page: PageBuffer, x: number, y: number, w: number, h: number, fill: boolean) {
+export function pdfRect(
+    page: PdfPageBuffer,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    fill: boolean
+) {
     page.push(`${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re`);
     page.push(fill ? "f" : "S");
 }
 
-function buildPdf(pages: PageBuffer[]): Uint8Array {
+export function pdfLine(
+    page: PdfPageBuffer,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    gray = 0
+) {
+    page.push(`${gray} G`);
+    page.push(`${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
+    page.push("0 G");
+}
+
+export function buildPdf(
+    pages: PdfPageBuffer[],
+    size: PdfPageSize = A4_LANDSCAPE
+): Uint8Array {
     const raw: string[] = [];
 
     const add = (body: string): number => {
@@ -211,7 +246,12 @@ function buildPdf(pages: PageBuffer[]): Uint8Array {
 
     add("<< /Type /Catalog /Pages 2 0 R >>");
     add("<< /Type /Pages /Kids [] /Count 0 >>");
-    const fontId = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+    const fontId = add(
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+    );
+    const boldId = add(
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
+    );
 
     const pageIds: number[] = [];
 
@@ -220,7 +260,7 @@ function buildPdf(pages: PageBuffer[]): Uint8Array {
         const contentId = add(`<< /Length ${body.length} >> stream\n${body}endstream`);
         pageIds.push(
             add(
-                `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`
+                `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${size.width} ${size.height}] /Resources << /Font << /F1 ${fontId} 0 R /F2 ${boldId} 0 R >> >> /Contents ${contentId} 0 R >>`
             )
         );
     }
@@ -260,16 +300,33 @@ function buildPdf(pages: PageBuffer[]): Uint8Array {
     return bytes;
 }
 
+export function downloadPdfBytes(bytes: Uint8Array, fileTitle: string): void {
+    const blob = new Blob(
+        [bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer],
+        { type: "application/pdf" }
+    );
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `${slugify(fileTitle)}.pdf`;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
-    const pages: PageBuffer[] = [];
-    let page = beginPage();
+    const pages: PdfPageBuffer[] = [];
+    let page = beginPdfPage();
     let y = PAGE_HEIGHT - MARGIN;
 
     const usableWidth = PAGE_WIDTH - MARGIN * 2;
 
     const newPage = () => {
         pages.push(page);
-        page = beginPage();
+        page = beginPdfPage();
         y = PAGE_HEIGHT - MARGIN;
     };
 
@@ -279,7 +336,7 @@ function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
         }
     };
 
-    pushText(page, MARGIN, y, TITLE_SIZE, fileTitle);
+    pdfText(page, MARGIN, y, TITLE_SIZE, fileTitle);
     y -= TITLE_SIZE + 6;
 
     const companyName = mecarvit.company?.nome?.trim();
@@ -287,7 +344,7 @@ function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
     const headerLine = [companyName, exportedAt].filter(Boolean).join("  ·  ");
 
     if (headerLine) {
-        pushText(page, MARGIN, y, FONT_SIZE, headerLine);
+        pdfText(page, MARGIN, y, FONT_SIZE, headerLine);
         y -= LINE_HEIGHT + 8;
     } else {
         y -= 4;
@@ -302,32 +359,30 @@ function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
 
         if (table.title) {
             ensureSpace(LINE_HEIGHT + 8);
-            pushText(page, MARGIN, y, 11, table.title);
+            pdfText(page, MARGIN, y, 11, table.title);
             y -= LINE_HEIGHT + 4;
         }
 
         const drawHeader = () => {
             ensureSpace(LINE_HEIGHT + 6);
             page.push("0.92 g");
-            pushRect(page, MARGIN, y - 3, usableWidth, LINE_HEIGHT + 4, true);
+            pdfRect(page, MARGIN, y - 3, usableWidth, LINE_HEIGHT + 4, true);
             page.push("0 g");
 
             headers.forEach((header, index) => {
                 const x = MARGIN + 4 + index * colWidth;
-                pushText(page, x, y, FONT_SIZE, header.label);
+                pdfText(page, x, y, FONT_SIZE, header.label);
             });
 
             y -= LINE_HEIGHT + 6;
-            page.push("0.7 G");
-            page.push(`${MARGIN} ${y + LINE_HEIGHT + 2} m ${MARGIN + usableWidth} ${y + LINE_HEIGHT + 2} l S`);
-            page.push("0 G");
+            pdfLine(page, MARGIN, y + LINE_HEIGHT + 2, MARGIN + usableWidth, y + LINE_HEIGHT + 2, 0.7);
         };
 
         drawHeader();
 
         if (rows.length === 0) {
             ensureSpace(LINE_HEIGHT);
-            pushText(page, MARGIN + 4, y, FONT_SIZE, "Nenhum registro encontrado.");
+            pdfText(page, MARGIN + 4, y, FONT_SIZE, "Nenhum registro encontrado.");
             y -= LINE_HEIGHT + 12;
             continue;
         }
@@ -349,7 +404,7 @@ function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
                 const x = MARGIN + 4 + index * colWidth;
 
                 lines.forEach((line, lineIndex) => {
-                    pushText(page, x, y - lineIndex * LINE_HEIGHT, FONT_SIZE, line);
+                    pdfText(page, x, y - lineIndex * LINE_HEIGHT, FONT_SIZE, line);
                 });
             });
 
@@ -361,24 +416,11 @@ function layoutAndBuild(fileTitle: string, tables: PdfTable[]): Uint8Array {
 
     pages.push(page);
 
-    return buildPdf(pages);
+    return buildPdf(pages, A4_LANDSCAPE);
 }
 
 export function downloadTablesPdf(fileTitle: string, tables: PdfTable[]): void {
-    const bytes = layoutAndBuild(fileTitle, tables);
-    const blob = new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer], {
-        type: "application/pdf"
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-
-    link.href = url;
-    link.download = `${slugify(fileTitle)}.pdf`;
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadPdfBytes(layoutAndBuild(fileTitle, tables), fileTitle);
 }
 
 export function downloadTablePdf(
