@@ -108,10 +108,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { clearAuthToken } from "@base/http";
 import { project } from "@base/project";
-import { clearMecarvitSession, currentIsSuperadmin, mecarvit } from "../js/mecarvit";
+import { currentIsSuperadmin, mecarvit } from "../js/mecarvit";
 import { sidebarNavItems } from "../js/sidebarNav";
+import { endSession } from "../js/auth";
 import Button from "@design/components/Button.vue";
 import AppUpdateButton from "@base/components/AppUpdateButton.vue";
 
@@ -139,8 +139,7 @@ function toggleTheme() {
 }
 
 async function logout() {
-    clearAuthToken();
-    clearMecarvitSession();
+    await endSession();
     await router.push({ name: "login" });
 }
 </script>

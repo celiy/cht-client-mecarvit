@@ -1,10 +1,11 @@
 import type { App } from "vue";
 import type { Router } from "vue-router";
-import { http } from "@base/http";
-import { onRealtimeEvent } from "@base/realtime";
+import { onHttpUnauthorized } from "@base/http";
+import { onRealtimeEvent, setRealtimeEnabled } from "@base/realtime";
 import { toast } from "@design/toast/toast";
 import { isCadastroRealtimePayload } from "@shared/mecarvit/realtime";
 import {
+    clearMecarvitSession,
     loadCurrentCompany,
     loadCurrentUser,
     mecarvitPlugin,
@@ -14,7 +15,7 @@ import {
 } from "./js/mecarvit";
 
 export function isAuthenticated(): boolean {
-    return Boolean(http.getAuthToken());
+    return Boolean(mecarvit.user);
 }
 
 export function setupAuthGuard(router: Router): void {
@@ -44,8 +45,18 @@ export async function installClientPlugins(app: App, router: Router): Promise<vo
     void router;
     app.use(mecarvitPlugin);
 
+    onHttpUnauthorized(() => {
+        clearMecarvitSession();
+        setRealtimeEnabled(false);
+    });
+
     await loadCurrentUser();
-    await loadCurrentCompany();
+
+    if (mecarvit.user) {
+        await loadCurrentCompany();
+    }
+
+    setRealtimeEnabled(Boolean(mecarvit.user));
 
     onRealtimeEvent((event) => {
         if (!isUsuarioSuperadmin(mecarvit.user ?? {})) {

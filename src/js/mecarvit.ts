@@ -147,11 +147,6 @@ export function setCurrentCompany(company: MecarvitCompany | null): void {
 }
 
 export async function loadCurrentUser(): Promise<void> {
-    if (!http.getAuthToken()) {
-        setCurrentUser(null);
-        return;
-    }
-
     try {
         const response = await http.get<MeApiResponse>("/api/me");
         const user = response.data.data;
@@ -168,11 +163,6 @@ export async function loadCurrentUser(): Promise<void> {
 }
 
 export async function loadCurrentCompany(): Promise<void> {
-    if (!http.getAuthToken()) {
-        setCurrentCompany(null);
-        return;
-    }
-
     try {
         const response = await http.get<EmpresaApiResponse>("/api/empresa");
         const company = response.data.data;

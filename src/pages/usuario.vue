@@ -86,8 +86,8 @@ import Card from "@design/components/Card.vue";
 import Button from "@design/components/Button.vue";
 import FormRenderer from "@design/components/form/FormRenderer.vue";
 import ChangePasswordForm from "../components/ChangePasswordForm.vue";
-import { clearAuthToken } from "@base/http";
-import { clearMecarvitSession, loadCurrentUser, mecarvit, currentCanManageProfile } from "../js/mecarvit";
+import { endSession } from "../js/auth";
+import { loadCurrentUser, mecarvit, currentCanManageProfile } from "../js/mecarvit";
 import { documentDigits, notifyHttpError } from "../js/crudHttp";
 import { HttpError } from "@base/http";
 
@@ -226,8 +226,7 @@ export default defineComponent({
         },
 
         async logout() {
-            clearAuthToken();
-            clearMecarvitSession();
+            await endSession();
             await this.$router.push("/login");
         }
     }

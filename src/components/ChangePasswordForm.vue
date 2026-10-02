@@ -71,8 +71,9 @@
 import { defineComponent } from "vue";
 import Button from "@design/components/Button.vue";
 import Input from "@design/components/Input.vue";
-import { clearAuthToken, HttpError } from "@base/http";
+import { HttpError } from "@base/http";
 import { validateChangeSenha } from "@shared/validators/mecarvit";
+import { endSession } from "../js/auth";
 import { loadCurrentUser } from "../js/mecarvit";
 
 export default defineComponent({
@@ -137,7 +138,7 @@ export default defineComponent({
             await loadCurrentUser();
 
             if (!this.cpf) {
-                clearAuthToken();
+                await endSession();
                 await this.$router.push({ name: "login" });
             }
         },
