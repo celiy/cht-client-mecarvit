@@ -11,6 +11,14 @@
                 </div>
             </template>
 
+            <template #header>
+                <div class="flex items-center gap-2 px-4 pt-3">
+                    <h4>
+                        {{ $mecarvit.company?.nome }}
+                    </h4>
+                </div>
+            </template>
+
             <template #footer>
                 <div class="text-sm">
                     <Marker separator />

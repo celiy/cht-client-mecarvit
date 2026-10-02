@@ -4,7 +4,8 @@ import { PAGAMENTO_SITUACAO } from "@shared/mecarvit/pagamentoSituacao";
 import { formatTableLabel } from "./formatTableLabel";
 
 export type DashboardPeriodo = "esta_semana" | "este_mes" | "6_meses" | "em_geral";
-export type DashboardMeses = 6 | 12;
+export type DashboardMeses = 6 | 12 | 72;
+export type FluxoModo = "diferenca" | "conjunto";
 
 export const PERIODO_OPTIONS: OptionItem[] = [
     { label: "Esta semana", value: "esta_semana" },
@@ -15,7 +16,13 @@ export const PERIODO_OPTIONS: OptionItem[] = [
 
 export const MESES_OPTIONS: OptionItem[] = [
     { label: "6 meses", value: "6" },
-    { label: "12 meses", value: "12" }
+    { label: "12 meses", value: "12" },
+    { label: "6 anos", value: "72" }
+];
+
+export const FLUXO_MODO_OPTIONS: Array<{ label: string; value: FluxoModo }> = [
+    { label: "Diferença", value: "diferenca" },
+    { label: "Conjunto", value: "conjunto" }
 ];
 
 export const PERIODO_LABEL: Record<DashboardPeriodo, string> = {
@@ -31,7 +38,8 @@ export const OS_STATUS_CHART_COLOR: Record<string, string> = {
     pendente: "warning",
     "em andamento": "blue-500",
     concluída: "success",
-    cancelada: "destructive"
+    cancelada: "destructive",
+    reaberta: "violet-500"
 };
 
 /** Matches pagamento badge colors in tables. */
@@ -54,31 +62,61 @@ export function optionLabel(options: OptionItem[], value: string | number): stri
 }
 
 export function parseMeses(value: string | number): DashboardMeses {
-    return Number(value) === 12 ? 12 : 6;
+    const n = Number(value);
+
+    if (n === 12) {
+        return 12;
+    }
+
+    if (n === 72) {
+        return 72;
+    }
+
+    return 6;
 }
 
 export type FluxoPagoItem = {
     date: string;
     value: number;
+    entrada?: number;
+    saida?: number;
 };
 
 export type GroupCountItem = {
     group: string;
     value: number;
+    id?: string;
 };
 
 export function fluxoToChartSeries(
     label: string,
     items: FluxoPagoItem[],
-    displayAs: "currency" | "sum" = "currency"
+    displayAs: "currency" | "sum" = "currency",
+    modo: FluxoModo = "diferenca",
+    yearly = false
 ): ChartSeries {
     return {
         label,
         displayAs,
-        items: items.map((item) => ({
-            value: item.value,
-            date: new Date(item.date)
-        }))
+        items: items.map((item) => {
+            const year = new Date(item.date).getFullYear();
+            const place = yearly
+                ? { group: String(year) }
+                : { date: new Date(item.date) };
+
+            if (modo === "conjunto") {
+                return {
+                    ...place,
+                    value: item.entrada ?? Math.max(0, item.value),
+                    valueNegative: item.saida ?? 0
+                };
+            }
+
+            return {
+                ...place,
+                value: item.value
+            };
+        })
     };
 }
 
@@ -102,7 +140,8 @@ export function groupsToChartSeries(
         items: items.map((item) => ({
             value: item.value,
             group: formatTableLabel(item.group),
-            color: colorForGroup(item.group, colorByGroup)
+            color: colorForGroup(item.group, colorByGroup),
+            id: item.id
         }))
     };
 }

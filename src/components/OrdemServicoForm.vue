@@ -233,7 +233,7 @@
                 label="Status"
                 placeholder="Selecione o status"
                 header="Selecione o status"
-                :options="statusOptions"
+                :options="editableStatusOptions"
                 :model-value="formValues.statusOsId"
 
                 @update:value="updateValue('statusOsId', $event)"
@@ -402,6 +402,7 @@ import Input from "@design/components/Input.vue";
 import Marker from "@design/components/Marker.vue";
 import Select from "@design/components/Select.vue";
 import { VEICULO_TIPO_OPTIONS } from "@shared/mecarvit/veiculoTipos";
+import { allowedOsStatusTargets, OS_STATUS } from "@shared/mecarvit/osStatus";
 import { formatDateInputValue } from "@shared/format/dateTime";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
 import { documentDigits, type DialogMode } from "../js/crudHttp";
@@ -915,6 +916,20 @@ export default defineComponent({
             );
 
             return found?.label || this.formValues.statusOsId || "—";
+        },
+
+        editableStatusOptions(): SelectOption[] {
+            const from = Number(this.formValues.statusOsId);
+            const allowed = new Set<number>([
+                from,
+                ...allowedOsStatusTargets(from, this.pagamentos.length > 0)
+            ]);
+
+            if (this.mode === "create") {
+                allowed.delete(OS_STATUS.REABERTA);
+            }
+
+            return this.statusOptions.filter((option) => allowed.has(Number(option.value)));
         },
 
         totalsDisplay(): { total: string } {

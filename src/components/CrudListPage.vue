@@ -188,7 +188,9 @@ export default defineComponent({
         },
 
         actions: {
-            type: Array as PropType<OptionItem[]>,
+            type: [Array, Function] as PropType<
+                OptionItem[] | ((row: Record<string, unknown>) => OptionItem[])
+            >,
             default: () => CRUD_ROW_ACTIONS
         },
 

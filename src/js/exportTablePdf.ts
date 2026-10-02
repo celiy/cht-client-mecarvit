@@ -1,5 +1,7 @@
 import {
     formatTableCellMask,
+    maskCpfDisplay,
+    maskDocumentoDisplay,
     tableCellMaskForField
 } from "@shared/format/displayMasks";
 import { formatDateTimeBr } from "@shared/format/dateTime";
@@ -107,9 +109,29 @@ function badgeLabel(value: unknown): string | null {
     return null;
 }
 
+function toggleCellHiddenText(value: unknown): string | null {
+    if (typeof value !== "object" || value === null || !("altValue" in value) || !("value" in value)) {
+        return null;
+    }
+
+    const hidden = (value as { value?: unknown }).value;
+
+    if (hidden == null) {
+        return "";
+    }
+
+    return String(hidden);
+}
+
 export function tableCellPlainText(value: unknown, field?: string): string {
     if (value == null || value === "") {
         return "";
+    }
+
+    const fromToggle = toggleCellHiddenText(value);
+
+    if (fromToggle != null) {
+        return fromToggle;
     }
 
     const fromBadge = badgeLabel(value);
@@ -123,6 +145,15 @@ export function tableCellPlainText(value: unknown, field?: string): string {
     }
 
     const text = String(value);
+
+    if (field === "cpf") {
+        return maskCpfDisplay(text);
+    }
+
+    if (field === "documento" || field === "clienteDocumento") {
+        return maskDocumentoDisplay(text);
+    }
+
     const format = tableCellMaskForField(field);
 
     return format ? formatTableCellMask(text, format) : text;

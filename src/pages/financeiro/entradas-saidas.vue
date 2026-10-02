@@ -158,12 +158,12 @@
             ref="itemDialog"
 
             v-model:is-open="dialogOpen"
+            size="large"
             :header="dialogHeader"
             :mode="dialogMode"
             :item="dialogItem"
             :fields="dialogFields"
             :saving="dialogSaving"
-            :submit-disabled="paymentModalOpen"
             :form-key="dialogKey"
 
             @save="onSave"
@@ -174,17 +174,14 @@
                 v-if="dialogMode === 'create' || dialogMode === 'edit' || dialogMode === 'view'"
                 #belowForm
             >
-                <div class="mt-4">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="small"
-                        left-icon="fa-money-bill"
-                        :label="dialogPagamentosButtonLabel"
+                <PagamentosEditor
+                    class="mt-4 rounded border-dashed border-border p-4"
+                    :valor-total="dialogValorTotal"
+                    :rows="dialogPagamentos"
+                    :readonly="dialogMode === 'view'"
 
-                        @click="openDialogPagamentos"
-                    />
-                </div>
+                    @update:rows="onDialogPagamentosRows"
+                />
             </template>
 
             <template
@@ -301,6 +298,7 @@ import { formatDateBr, formatDateInputValue } from "@shared/format/dateTime";
 import { osPagamentoBadge } from "../../js/osStatusBadge";
 import { pagamentoSituacao } from "@shared/mecarvit/pagamentoSituacao";
 import { dateToInputValue, registroFormFields } from "../../js/entityFields";
+import PagamentosEditor from "../../components/PagamentosEditor.vue";
 import PagamentosModal from "../../components/PagamentosModal.vue";
 import { moneyAmountToInputDigits, parseMoneyInput } from "@shared/format/moneyInput";
 import { sumPagamentosValor, type PagamentoFormRow } from "../../js/pagamentoOptions";
@@ -318,7 +316,12 @@ import {
     type ItemViewEditExpose,
     type ListResponse
 } from "../../js/crudHttp";
-import { currentCanCreate, currentCanDelete, currentCanExport, excludeCurrentUsuario } from "../../js/mecarvit";
+import {
+    currentCanCreate,
+    currentCanDelete,
+    currentCanExport,
+    excludeCurrentUsuario
+} from "../../js/mecarvit";
 import { toSortQuery, type SortFieldPayload } from "../../js/sortTableRows";
 import { downloadTablesPdf } from "../../js/exportTablePdf";
 import { formatTableLabel } from "../../js/formatTableLabel";
@@ -417,7 +420,6 @@ interface RegistroFormValues {
     dataLimitePagamento: string;
 }
 
-
 function emptyRegistroForm(tipo = ""): RegistroFormValues {
     return {
         tipo,
@@ -502,6 +504,7 @@ export default defineComponent({
         FilterInputs,
         ItemViewEdit,
         OrdemServicoForm,
+        PagamentosEditor,
         PagamentosModal,
         Pagination
     },
@@ -675,12 +678,10 @@ export default defineComponent({
             return this.dialogItem.nome || "Lançamento";
         },
 
-        dialogPagamentosButtonLabel(): string {
-            if (this.dialogMode === "create") {
-                return "Registrar pagamentos";
-            }
+        dialogValorTotal(): number | undefined {
+            const valor = parseMoneyInput(this.dialogItem.valor);
 
-            return "Gerenciar pagamentos";
+            return valor == null ? undefined : valor;
         },
 
         dialogFields() {
@@ -792,6 +793,11 @@ export default defineComponent({
             this.itemDialog()?.setFieldValue("valorPago", label);
         },
 
+        onDialogPagamentosRows(rows: PagamentoFormRow[]) {
+            this.dialogPagamentos = rows;
+            this.syncDialogValorPago();
+        },
+
         buildPaymentTarget(registroId: number, ordemServicoId: number | null, valorTotal: number) {
             return {
                 registroId,
@@ -884,25 +890,12 @@ export default defineComponent({
             }));
         },
 
-        pagamentosPayload(): Array<{ tipo: string; valor: number }> {
+        pagamentosPayload(): Array<{ id?: number; tipo: string; valor: number }> {
             return this.dialogPagamentos.map((row) => ({
+                ...(row.id != null ? { id: row.id } : {}),
                 tipo: row.tipo,
                 valor: Number(row.valor)
             }));
-        },
-
-        openDialogPagamentos() {
-            const registroId = Number(this.dialogItem.id);
-            const valorTotal = parseMoneyInput(this.dialogItem.valor) ?? 0;
-
-            this.paymentReadonly = false;
-            this.paymentModalRows = [...this.dialogPagamentos];
-            this.paymentTarget = this.buildPaymentTarget(
-                Number.isInteger(registroId) && registroId > 0 ? registroId : 0,
-                this.linkedOrdemServicoId,
-                Number.isFinite(valorTotal) ? valorTotal : 0
-            );
-            this.paymentModalOpen = true;
         },
 
         async onEntradaFilterSearch(payload: { filterKey: string; field: string; value: string }) {
@@ -1455,9 +1448,7 @@ export default defineComponent({
                     body.valor = valor;
                 }
 
-                if (!this.linkedOrdemServicoId && this.dialogPagamentos.length > 0) {
-                    body.pagamentos = this.pagamentosPayload();
-                }
+                body.pagamentos = this.pagamentosPayload();
 
                 if (this.dialogMode === "create") {
                     await this.$http.post("/api/regentradasaida", body);

@@ -19,7 +19,8 @@ const COLOR_BY_STATUS_ID: Record<number, string> = {
     3: "blue-500",
     4: "success",
     5: "destructive",
-    6: "slate-500"
+    6: "slate-500",
+    7: "violet-500"
 };
 
 const DEFAULT_COLOR = "slate-500";
@@ -36,6 +37,7 @@ function cssColorValue(rawColor: string): string {
         destructive: "var(--color-destructive)",
         "blue-500": "var(--color-blue-500)",
         "slate-500": "var(--color-slate-500)",
+        "violet-500": "var(--color-violet-500)",
         "gray-500": "var(--color-gray-500)",
         "red-500": "var(--color-red-500)",
         "green-500": "var(--color-green-500)",

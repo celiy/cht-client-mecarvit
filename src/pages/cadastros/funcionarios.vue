@@ -28,6 +28,27 @@
         @export="onExport"
         @sort="onSort"
     >
+        <template #headerActions>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                    v-if="canCreate"
+
+                    label="Cadastrar"
+                    left-icon="fa-plus"
+
+                    @click="onCreate"
+                />
+
+                <Button
+                    v-if="canManageCargos"
+
+                    label="Gerenciar cargos"
+                    left-icon="fa-id-badge"
+
+                    @click="openCargosList"
+                />
+            </div>
+        </template>
         <ItemViewEdit
             ref="itemDialog"
 
@@ -109,6 +130,53 @@
             @cancel="closeCargoDialog"
             @update:field="onCargoFieldChange"
         />
+
+        <Modal
+            :is-open="cargosListOpen"
+            size="medium"
+
+            @update:value="onCargosListOpenChange"
+        >
+            <template #header>Cargos</template>
+
+            <template #body>
+                <Table
+                    :headers="cargoListHeaders"
+                    :actions="cargoListActions"
+                    :data="cargoListRows"
+                    :loading="cargoSearchLoading"
+
+                    @click:action="onCargoListAction"
+                >
+                    <template #empty>
+                        <EmptyTableMessage
+                            title="Nenhum cargo cadastrado."
+                            description="Cadastre um cargo para usar nos funcionários."
+                        />
+                    </template>
+                </Table>
+            </template>
+
+            <template #footer>
+                <div class="flex flex-wrap justify-end gap-2">
+                    <Button
+                        v-if="canManageCargos"
+
+                        label="Cadastrar"
+                        left-icon="fa-plus"
+
+                        @click="openCargoCreateDialog"
+                    />
+
+                    <Button
+                        variant="secondary"
+                        label="Fechar"
+
+                        @click="cargosListOpen = false"
+                    />
+                </div>
+            </template>
+        </Modal>
     </CrudListPage>
 </template>
 
@@ -122,6 +190,7 @@ import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
 import Button from "@design/components/Button.vue";
 import ConfirmationModal from "@design/components/custom/ConfirmationModal.vue";
+import EmptyTableMessage from "../../components/EmptyTableMessage.vue";
 import {
     ATIVO_FILTER_OPTIONS,
     CRUD_ROW_ACTIONS,
@@ -150,6 +219,7 @@ import {
     isUsuarioSuperadmin
 } from "../../js/mecarvit";
 import { downloadTablePdf } from "../../js/exportTablePdf";
+import { cpfToggleCell, unwrapToggleCell } from "../../js/sensitiveTableCell";
 import {
     ACCESS_AREAS,
     ACCESS_LEVELS,
@@ -349,6 +419,7 @@ export default defineComponent({
         Button,
         ConfirmationModal,
         CrudListPage,
+        EmptyTableMessage,
         ItemViewEdit
     },
 
@@ -386,6 +457,7 @@ export default defineComponent({
             cargoDialogKey: 0,
             cargoSearchSeq: 0,
             cargoSearchLoading: false,
+            cargosListOpen: false,
             selectedCargoId: "",
             page: 1,
             sort: "",
@@ -441,7 +513,22 @@ export default defineComponent({
             );
         },
         tableRows() {
-            return this.funcionarios as unknown as Array<Record<string, unknown>>;
+            return this.funcionarios.map((user) => ({
+                ...user,
+                cpf: this.canSeePii ? cpfToggleCell(user.cpf) : user.cpf
+            })) as unknown as Array<Record<string, unknown>>;
+        },
+
+        cargoListHeaders(): TableHeader[] {
+            return [{ label: "Nome", field: "nome", position: "start" }];
+        },
+
+        cargoListRows() {
+            return excludeSuperadminCargos(this.cargos) as unknown as Array<Record<string, unknown>>;
+        },
+
+        cargoListActions() {
+            return [{ label: "Editar", value: "edit", icon: "fa-pen" }];
         },
 
         dialogHeader(): string {
@@ -830,7 +917,7 @@ export default defineComponent({
         },
 
         async openUsuarioDialog(mode: "view" | "edit", row: Record<string, unknown>) {
-            const cpf = documentDigits(row.cpf);
+            const cpf = documentDigits(unwrapToggleCell(row.cpf));
 
             if (!cpf) {
                 this.$toast.error("CPF do funcionário é inválido.");
@@ -876,7 +963,7 @@ export default defineComponent({
         },
 
         async onDelete(item: Record<string, unknown>) {
-            const cpf = documentDigits(item.cpf);
+            const cpf = documentDigits(unwrapToggleCell(item.cpf));
 
             if (!cpf) {
                 this.$toast.error("CPF do funcionário é inválido.");
@@ -912,17 +999,28 @@ export default defineComponent({
             this.cargoDialogOpen = true;
         },
 
-        openCargoEditDialog() {
-            const selectedId = String(
-                this.itemDialog()?.getFieldValue("cargoId") ?? this.dialogItem.cargoId ?? ""
-            );
-            const cargo = this.cargos.find((item) => String(item.id) === selectedId);
+        openCargosList() {
+            this.cargosListOpen = true;
+            void this.getCargos();
+        },
 
-            if (!cargo) {
-                this.openCargoCreateDialog();
+        onCargosListOpenChange(open: boolean) {
+            this.cargosListOpen = open;
+        },
+
+        onCargoListAction(value: string, item: Record<string, unknown>) {
+            if (value !== "edit") {
                 return;
             }
 
+            const cargo = this.cargos.find((entry) => entry.id === Number(item.id));
+
+            if (cargo) {
+                this.openCargoEditFrom(cargo);
+            }
+        },
+
+        openCargoEditFrom(cargo: CargoApi) {
             const parsed = areaLevelsFromKeys(parsePermissions(String(cargo.nivelAcesso ?? "")));
 
             this.cargoDialogKey += 1;
@@ -937,6 +1035,20 @@ export default defineComponent({
             };
             this.cargoSaving = false;
             this.cargoDialogOpen = true;
+        },
+
+        openCargoEditDialog() {
+            const selectedId = String(
+                this.itemDialog()?.getFieldValue("cargoId") ?? this.dialogItem.cargoId ?? ""
+            );
+            const cargo = this.cargos.find((item) => String(item.id) === selectedId);
+
+            if (!cargo) {
+                this.openCargoCreateDialog();
+                return;
+            }
+
+            this.openCargoEditFrom(cargo);
         },
 
         onUsuarioFieldChange(payload: { id: string; value: unknown }) {
@@ -1127,7 +1239,10 @@ export default defineComponent({
 
                 await this.$nextTick();
 
-                this.itemDialog()?.setFieldValue("cargoId", String(created.id));
+                if (this.dialogOpen) {
+                    this.itemDialog()?.setFieldValue("cargoId", String(created.id));
+                }
+
                 this.closeCargoDialog();
                 this.$toast.success("Cargo criado.");
             } catch (error) {

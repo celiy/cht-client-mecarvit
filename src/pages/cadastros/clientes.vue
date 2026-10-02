@@ -79,7 +79,7 @@
                 #aboveCriadoModificado
             >
                 <section
-                    class="mt-4 border-t border-border pt-2"
+                    class="mt-4 border-t pt-2"
                     aria-labelledby="cliente-ordens-servico-heading"
                 >
                     <h4
@@ -114,9 +114,10 @@
                             v-for="os in clienteOrdens"
                             :key="os.id"
 
+                            type="button"
                             :label="clienteOrdemRowLabel(os)"
 
-                            @click="openClienteOsView(os.id)"
+                            @click.stop="openClienteOsView(os.id)"
                         />
                     </div>
                 </section>
@@ -218,6 +219,7 @@
 import { defineComponent } from "vue";
 import { toQueryString } from "@shared/frontend/queryString";
 import Button from "@design/components/Button.vue";
+import Modal from "@design/components/Modal.vue";
 import type { FilterDef, FilterValues } from "../../components/FilterInputs.vue";
 import ItemViewEdit from "../../components/ItemViewEdit.vue";
 import CrudListPage, { type TableHeader } from "../../components/CrudListPage.vue";
@@ -269,6 +271,7 @@ import {
     currentCanSeePii
 } from "../../js/mecarvit";
 import { downloadTablePdf } from "../../js/exportTablePdf";
+import { documentoToggleCell, unwrapToggleCell } from "../../js/sensitiveTableCell";
 
 interface StatusOsApi {
     id: number;
@@ -413,6 +416,7 @@ export default defineComponent({
         Button,
         CrudListPage,
         ItemViewEdit,
+        Modal,
         OrdemServicoForm,
         PagamentosModal
     },
@@ -509,11 +513,18 @@ export default defineComponent({
                 return CRUD_ROW_ACTIONS;
             }
 
-            return CRUD_ROW_ACTIONS.filter((action) => action.value !== "delete" && !action.separator);
+            return CRUD_ROW_ACTIONS.filter(
+                (action) => action.value !== "delete" && !action.separator
+            );
         },
 
         tableRows() {
-            return this.clientes as unknown as Array<Record<string, unknown>>;
+            return this.clientes.map((cliente) => ({
+                ...cliente,
+                documento: this.canSeePii
+                    ? documentoToggleCell(cliente.documento)
+                    : cliente.documento
+            })) as unknown as Array<Record<string, unknown>>;
         },
 
         dialogHeader(): string {
@@ -870,14 +881,16 @@ export default defineComponent({
             }
         },
 
-        async openClienteOsView(osId: number) {
-            if (!Number.isInteger(osId) || osId <= 0) {
+        async openClienteOsView(osId: number | string) {
+            const id = Number(osId);
+
+            if (!Number.isInteger(id) || id <= 0) {
                 return;
             }
 
             try {
                 const response = await this.$http.get<ItemResponse<OrdemServicoApi>>(
-                    `/api/ordem-servico/${osId}`
+                    `/api/ordem-servico/${id}`
                 );
                 const os = response.data.data;
                 const veiculo = this.dialogVehicles.find((entry) => entry.id === os.veiculoId);
@@ -899,12 +912,11 @@ export default defineComponent({
                     modificadoEm: row.modificadoEm
                 }));
                 this.clienteOsFormFuncionarios = [];
+                this.clienteOsDialogOpen = true;
 
                 await this.ensureClienteOsFuncionariosForCpfs(
                     this.clienteOsDialogItem.responsaveisCpfs ?? []
                 );
-
-                this.clienteOsDialogOpen = true;
             } catch (error) {
                 notifyHttpError(
                     this.$toast,
@@ -926,7 +938,6 @@ export default defineComponent({
             this.editingVeiculoId = null;
         },
 
-        
         onSort(payload: SortFieldPayload) {
             this.page = 1;
             this.sort = toSortQuery(payload);
@@ -1092,7 +1103,7 @@ export default defineComponent({
         },
 
         async openClienteDialog(mode: "view" | "edit", row: Record<string, unknown>) {
-            const documento = documentDigits(row.documento);
+            const documento = documentDigits(unwrapToggleCell(row.documento));
 
             if (!documento) {
                 this.$toast.error("Documento do cliente é inválido.");
@@ -1131,7 +1142,7 @@ export default defineComponent({
         },
 
         async onDelete(item: Record<string, unknown>) {
-            const documento = documentDigits(item.documento);
+            const documento = documentDigits(unwrapToggleCell(item.documento));
 
             if (!documento) {
                 this.$toast.error("Documento do cliente é inválido.");

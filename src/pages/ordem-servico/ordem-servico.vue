@@ -105,21 +105,34 @@
 
             <template #footer>
                 <div class="flex flex-wrap justify-end gap-2">
-                    <Button
-                        v-if="canExportDialogOs"
+                    <div class="mr-auto flex flex-wrap items-center gap-2">
+                        <Button
+                            v-if="canExportDialogOs"
 
-                        v-tooltip="'Exportar esta OS para PDF'"
-                        variant="secondary"
-                        type="button"
-                        class="mr-auto"
-                        aria-label="Exportar esta OS para PDF"
-                        :disabled="exportingOs || dialogSaving || paymentModalOpen"
+                            v-tooltip="'Exportar esta OS para PDF'"
+                            variant="secondary"
+                            type="button"
+                            aria-label="Exportar esta OS para PDF"
+                            :disabled="exportingOs || dialogSaving || paymentModalOpen"
 
-                        @click="onExportDialogOs"
-                    >
-                        <span class="fa-solid fa-file-pdf text-xs" />
-                        <span class="ml-2">Exportar PDF</span>
-                    </Button>
+                            @click="onExportDialogOs"
+                        >
+                            <span class="fa-solid fa-file-pdf text-xs" />
+                            <span class="ml-2">Exportar PDF</span>
+                        </Button>
+
+                        <Button
+                            v-if="showOsModeToggle"
+
+                            variant="secondary"
+                            type="button"
+                            :disabled="dialogSaving || paymentModalOpen"
+
+                            @click="toggleOsDialogMode"
+                        >
+                            {{ dialogMode === "view" ? "Editar" : "Visualizar" }}
+                        </Button>
+                    </div>
 
                     <template v-if="dialogMode === 'view'">
                         <Button
@@ -222,6 +235,7 @@ import {
     excludeCurrentUsuario
 } from "../../js/mecarvit";
 import { PERMISSIONS } from "@shared/mecarvit/access";
+import { allowedOsStatusTargets, osStatusChangeBlockedReason } from "@shared/mecarvit/osStatus";
 import { downloadTablePdf } from "../../js/exportTablePdf";
 import { downloadOsPdf } from "../../js/exportOsPdf";
 
@@ -234,10 +248,13 @@ function buildOsRowActions(
         canDelete: boolean;
         canSeePagamentos: boolean;
         canChangeStatus: boolean;
+        fromStatus: number;
+        hasPayments: boolean;
     }
 ): OptionItem[] {
+    const allowed = new Set(allowedOsStatusTargets(options.fromStatus, options.hasPayments));
     const statusOptions: OptionItem[] = statusList
-        .filter((status) => status.id !== 6)
+        .filter((status) => allowed.has(status.id))
         .map((status) => ({
             label: formatTableLabel(status.nome),
             value: `${OS_STATUS_ACTION_PREFIX}${status.id}`,
@@ -254,7 +271,8 @@ function buildOsRowActions(
             label: "Pagamentos",
             value: "pagamentos",
             icon: "fa-money-bill",
-            tooltip: "Adicione, edite, remova pagamentos"
+            tooltip: "Adicione, edite, remova pagamentos",
+            tooltipPlacement: "left"
         });
     }
 
@@ -417,6 +435,18 @@ export default defineComponent({
             return this.canExport && this.dialogOpen && this.dialogItem.id != null;
         },
 
+        showOsModeToggle(): boolean {
+            if (!this.dialogOpen || this.dialogItem.id == null) {
+                return false;
+            }
+
+            if (this.dialogMode !== "view" && this.dialogMode !== "edit") {
+                return false;
+            }
+
+            return this.canCreate || currentHasPermission(PERMISSIONS.os.editar);
+        },
+
         canSeeClientePii(): boolean {
             return currentCanSeePii("clientes");
         },
@@ -471,15 +501,18 @@ export default defineComponent({
             return currentHasPermission(PERMISSIONS.os.editar) && !this.canCreate;
         },
 
-        rowActions(): OptionItem[] {
-            return buildOsRowActions(this.statusOs, {
-                canCreate: this.canCreate,
-                canDelete: currentCanDelete("os"),
-                canSeePagamentos:
-                    currentHasPermission(PERMISSIONS.financeiro.editar) ||
-                    currentCanCreate("financeiro"),
-                canChangeStatus: this.canChangeOsStatus
-            });
+        rowActions(): (row: Record<string, unknown>) => OptionItem[] {
+            return (row: Record<string, unknown>) =>
+                buildOsRowActions(this.statusOs, {
+                    canCreate: this.canCreate,
+                    canDelete: currentCanDelete("os"),
+                    canSeePagamentos:
+                        currentHasPermission(PERMISSIONS.financeiro.editar) ||
+                        currentCanCreate("financeiro"),
+                    canChangeStatus: this.canChangeOsStatus,
+                    fromStatus: Number(row.statusOsId),
+                    hasPayments: Boolean(row.temPagamentos)
+                });
         },
 
         osFilters(): FilterDef[] {
@@ -595,19 +628,11 @@ export default defineComponent({
         },
 
         statusSelectOptions() {
-            return this.statusOs
-                .filter((status) => {
-                    if (status.id !== 6) {
-                        return true;
-                    }
-
-                    return this.dialogOrcamento || this.dialogItem.statusOsId === "6";
-                })
-                .map((status) => ({
-                    label: formatTableLabel(status.nome),
-                    value: String(status.id),
-                    indicator: osStatusIndicator(status.id)
-                }));
+            return this.statusOs.map((status) => ({
+                label: formatTableLabel(status.nome),
+                value: String(status.id),
+                indicator: osStatusIndicator(status.id)
+            }));
         },
 
         funcionarioSelectOptions() {
@@ -649,6 +674,24 @@ export default defineComponent({
         }
     },
 
+    watch: {
+        "$route.query.os": {
+            immediate: true,
+            handler(value: unknown) {
+                const raw = Array.isArray(value) ? value[0] : value;
+                const id = Number(raw);
+
+                if (!Number.isInteger(id) || id <= 0) {
+                    return;
+                }
+
+                void this.clearOsQuery().then(() => {
+                    void this.openOsDialog("view", { id });
+                });
+            }
+        }
+    },
+
     mounted() {
         void this.getLookups();
     },
@@ -678,6 +721,7 @@ export default defineComponent({
             this.dialogPagamentos = [];
             this.dialogOrcamento = false;
             void this.listPage()?.clearCadastrarQuery?.();
+            void this.clearOsQuery();
         },
 
         onDialogOpenChange(open: boolean) {
@@ -685,6 +729,33 @@ export default defineComponent({
 
             if (!open) {
                 void this.listPage()?.clearCadastrarQuery?.();
+                void this.clearOsQuery();
+            }
+        },
+
+        clearOsQuery() {
+            const query = { ...this.$route.query };
+
+            if (query.os == null) {
+                return Promise.resolve();
+            }
+
+            delete query.os;
+
+            return this.$router.replace({
+                query,
+                hash: this.$route.hash
+            });
+        },
+
+        toggleOsDialogMode() {
+            if (this.dialogMode === "view") {
+                this.dialogMode = "edit";
+                return;
+            }
+
+            if (this.dialogMode === "edit") {
+                this.dialogMode = "view";
             }
         },
 
@@ -910,7 +981,8 @@ export default defineComponent({
                         : osPagamentoBadge(
                               os.pagamentoSituacao ?? undefined,
                               this.canSeePagamentos ? formatDateBr(osDataLimitePagamento(os)) : ""
-                          )
+                          ),
+                temPagamentos: (os.pagamentos ?? []).length > 0
             };
         },
 
@@ -1130,7 +1202,12 @@ export default defineComponent({
                     return;
                 }
 
-                void this.quickChangeOsStatus(osId, statusOsId, currentStatusId);
+                void this.quickChangeOsStatus(
+                    osId,
+                    statusOsId,
+                    currentStatusId,
+                    Boolean(item.temPagamentos)
+                );
 
                 return;
             }
@@ -1154,8 +1231,20 @@ export default defineComponent({
             }
         },
 
-        async quickChangeOsStatus(osId: number, statusOsId: number, currentStatusId: number) {
+        async quickChangeOsStatus(
+            osId: number,
+            statusOsId: number,
+            currentStatusId: number,
+            hasPayments: boolean
+        ) {
             if (!this.canChangeOsStatus || statusOsId === currentStatusId) {
+                return;
+            }
+
+            const blocked = osStatusChangeBlockedReason(currentStatusId, statusOsId, hasPayments);
+
+            if (blocked) {
+                this.$toast.error(blocked);
                 return;
             }
 
