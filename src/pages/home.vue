@@ -54,9 +54,9 @@
                                                     <b>{{ card.title }}</b>
                                                 </p>
 
-                                                <small class="text-muted-foreground!">
+                                                <small-muted>
                                                     {{ card.description }}
-                                                </small>
+                                                </small-muted>
                                             </div>
                                         </div>
 
