@@ -26,13 +26,12 @@
                     <Popover
                         close-on-content-click
                         panel-class="p-0"
-                        class="pt-2 pb-4"
+                        class="w-full pt-2 pb-4"
                     >
                         <template #button="{ toggle, isOpen }">
                             <Button
                                 variant="transparent"
-                                class="flex w-full justify-start!"
-                                content-position="none"
+                                class="w-full"
 
                                 @click.stop="toggle"
                             >

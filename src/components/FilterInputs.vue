@@ -59,17 +59,21 @@
                 </div>
             </div>
 
-            <Button
+            <div
                 v-if="hasAppliedFilters"
 
-                v-tooltip="'Limpar filtros'"
-                class="p-2.5"
-                aria-label="Limpar filtros"
-
-                @click="clearFilters"
+                class="relative h-fit w-fit"
             >
-                <span class="fa-solid fa-xmark text-xs" />
-            </Button>
+                <Button
+                    v-tooltip="'Limpar filtros'"
+                    class="p-2.5"
+                    aria-label="Limpar filtros"
+
+                    @click="clearFilters"
+                >
+                    <span class="fa-solid fa-xmark text-xs" />
+                </Button>
+            </div>
 
             <div class="relative h-fit w-fit">
                 <Button
