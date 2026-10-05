@@ -10,6 +10,7 @@
 import { defineComponent } from "vue";
 import ElectronStartupGate from "@base/electron/ElectronStartupGate.vue";
 import DevToolsExample from "./components/DevToolsExample.vue";
+import { projectActions } from "@base/project";
 
 export default defineComponent({
     name: "MecarvitApp",
@@ -17,6 +18,14 @@ export default defineComponent({
     components: {
         ElectronStartupGate,
         DevToolsExample
+    },
+
+    /**
+     * Creates the component
+     * @returns {void}
+     */
+    created() {
+        projectActions.setCustomTheme("hodiernus");
     }
 });
 </script>
