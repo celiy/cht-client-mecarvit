@@ -612,7 +612,7 @@ export default defineComponent({
                     prefix: "Entradas pagas",
                     cardStyle: {
                         icon: { backgroundStyle: "bg-green-500/10", iconStyle: "text-green-500" },
-                        card: { borderStyle: "border-green-500/50 border-2" }
+                        card: { borderStyle: "border-green-500/50 border-2 reveal-highlight" }
                     }
                 },
                 {
@@ -622,7 +622,7 @@ export default defineComponent({
                     prefix: "Saídas pagas",
                     cardStyle: {
                         icon: { backgroundStyle: "bg-lime-500/10", iconStyle: "text-lime-500" },
-                        card: { borderStyle: "border-lime-500/50 border-2" }
+                        card: { borderStyle: "border-lime-500/50 border-2 reveal-highlight" }
                     }
                 },
                 {
@@ -632,7 +632,7 @@ export default defineComponent({
                     prefix: "Entradas a vencer",
                     cardStyle: {
                         icon: { backgroundStyle: "bg-yellow-500/10", iconStyle: "text-yellow-500" },
-                        card: { borderStyle: "border-yellow-500/50 border-2" }
+                        card: { borderStyle: "border-yellow-500/50 border-2 reveal-highlight" }
                     }
                 },
                 {
@@ -642,7 +642,7 @@ export default defineComponent({
                     prefix: "Saídas a vencer",
                     cardStyle: {
                         icon: { backgroundStyle: "bg-amber-500/10", iconStyle: "text-amber-500" },
-                        card: { borderStyle: "border-amber-500/50 border-2" }
+                        card: { borderStyle: "border-amber-500/50 border-2 reveal-highlight" }
                     }
                 },
                 {
@@ -652,7 +652,7 @@ export default defineComponent({
                     prefix: "Entradas atrasadas",
                     cardStyle: {
                         icon: { backgroundStyle: "bg-orange-500/10", iconStyle: "text-orange-500" },
-                        card: { borderStyle: "border-orange-500/50 border-2" }
+                        card: { borderStyle: "border-orange-500/50 border-2 reveal-highlight" }
                     }
                 },
                 {
@@ -662,7 +662,7 @@ export default defineComponent({
                     prefix: "Saídas atrasadas",
                     cardStyle: {
                         icon: { backgroundStyle: "bg-red-500/10", iconStyle: "text-red-500" },
-                        card: { borderStyle: "border-red-500/50 border-2" }
+                        card: { borderStyle: "border-red-500/50 border-2 reveal-highlight" }
                     }
                 }
             ];
