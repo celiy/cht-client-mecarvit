@@ -4,6 +4,8 @@
             :title="$mecarvit.company?.nome"
             description="Sistema Mecarvit"
             :nav-items="navItems"
+
+            @link-button-click="onLinkButtonClick"
         >
             <template #top-bar>
                 <div class="ml-auto flex items-center pr-2">
@@ -140,5 +142,11 @@ function toggleTheme() {
 async function logout() {
     await endSession();
     await router.push({ name: "login" });
+}
+
+function onLinkButtonClick(emits: string) {
+    if (emits) {
+        void router.push(emits);
+    }
 }
 </script>

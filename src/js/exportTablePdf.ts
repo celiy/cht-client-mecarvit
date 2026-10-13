@@ -159,7 +159,7 @@ export function tableCellPlainText(value: unknown, field?: string): string {
     return format ? formatTableCellMask(text, format) : text;
 }
 
-function wrapText(text: string, maxChars: number): string[] {
+export function wrapText(text: string, maxChars: number): string[] {
     const trimmed = text.trim() || "—";
 
     if (maxChars < 4) {

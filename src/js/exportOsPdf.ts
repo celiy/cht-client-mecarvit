@@ -11,6 +11,7 @@ import {
     pdfLine,
     pdfRect,
     pdfText,
+    wrapText,
     type PdfPageBuffer
 } from "./exportTablePdf";
 import { mecarvit } from "./mecarvit";
@@ -30,6 +31,7 @@ const PAGE = A4_PORTRAIT;
 const INNER_PAD = 14;
 const MIN_SERVICE_ROWS = 14;
 const STATUS_ORCAMENTO = 6;
+const FIELD_LINE_STEP = 14;
 
 function moneyFromDigits(value: string): string {
     const amount = parseMoneyInput(value);
@@ -65,6 +67,12 @@ function checkbox(
     pdfText(page, x + size + 6, y + 1, 10, label, "F2");
 }
 
+/**
+ * Draws a labeled, underlined field.
+ *
+ * @param multiline Wraps the value onto extra underlined lines instead of truncating it
+ * @returns Extra height used below `y` by the wrapped lines
+ */
 function fieldLine(
     page: PdfPageBuffer,
     x: number,
@@ -72,16 +80,29 @@ function fieldLine(
     label: string,
     value: string,
     width: number,
-    labelWidth: number
-) {
+    labelWidth: number,
+    multiline = false
+): number {
     pdfText(page, x, y, 9, label, "F2");
     const valueX = x + labelWidth;
-    const lineY = y - 2;
-    pdfLine(page, valueX, lineY, x + width, lineY, 0.35);
+    const maxChars = Math.floor((width - labelWidth) / 4.6);
+    const lines = !value.trim()
+        ? [""]
+        : multiline
+          ? wrapText(value, maxChars)
+          : [truncate(value, maxChars)];
 
-    if (value.trim()) {
-        pdfText(page, valueX + 3, y, 9, truncate(value, Math.floor((width - labelWidth) / 4.6)));
-    }
+    lines.forEach((line, index) => {
+        const lineTextY = y - index * FIELD_LINE_STEP;
+
+        pdfLine(page, valueX, lineTextY - 2, x + width, lineTextY - 2, 0.35);
+
+        if (line) {
+            pdfText(page, valueX + 3, lineTextY, 9, line);
+        }
+    });
+
+    return (lines.length - 1) * FIELD_LINE_STEP;
 }
 
 function totalRow(
@@ -211,39 +232,45 @@ export function buildOsPdfBytes(input: ExportOsPdfInput): Uint8Array {
     );
     y -= 16;
 
-    fieldLine(
+    // Wrapped lines push the table down; the table gives back the same height in empty rows.
+    let wrappedHeight = fieldLine(
         page,
         contentLeft,
         y,
         "Diagnóstico cliente:",
         values.diagnosticoCliente.trim(),
         contentWidth,
-        98
+        98,
+        true
     );
-    y -= 18;
+    y -= 18 + wrappedHeight;
 
-    fieldLine(
+    const mecanicoHeight = fieldLine(
         page,
         contentLeft,
         y,
         "Diagnóstico mecânico:",
         values.diagnosticoMecanico.trim(),
         contentWidth,
-        108
+        108,
+        true
     );
-    y -= 16;
+    wrappedHeight += mecanicoHeight;
+    y -= 16 + mecanicoHeight;
 
     if (input.responsaveisLabels.length > 0) {
-        fieldLine(
+        const responsaveisHeight = fieldLine(
             page,
             contentLeft,
             y,
             "Responsáveis:",
             input.responsaveisLabels.join(", "),
             contentWidth,
-            72
+            72,
+            true
         );
-        y -= 16;
+        wrappedHeight += responsaveisHeight;
+        y -= 16 + responsaveisHeight;
     }
 
     y -= 6;
@@ -253,7 +280,7 @@ export function buildOsPdfBytes(input: ExportOsPdfInput): Uint8Array {
     const serviceColW = contentWidth - priceColW;
     const rowH = 16;
     const headerH = 18;
-    const serviceRows = Math.max(MIN_SERVICE_ROWS, itens.length);
+    const serviceRows = Math.max(MIN_SERVICE_ROWS - Math.ceil(wrappedHeight / rowH), itens.length);
     const tableH = headerH + serviceRows * rowH;
     const tableBottom = y - tableH;
 

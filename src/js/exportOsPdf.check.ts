@@ -6,7 +6,7 @@ function assert(cond: boolean, label: string) {
     }
 }
 
-const bytes = buildOsPdfBytes({
+const baseInput = {
     values: {
         id: 42,
         clienteDocumento: "52998224725",
@@ -38,11 +38,22 @@ const bytes = buildOsPdfBytes({
     pagamentos: [],
     includeClientePii: true,
     includePagamentos: true
-});
+};
+const bytes = buildOsPdfBytes(baseInput);
 
 const head = String.fromCharCode(...bytes.slice(0, 8));
 
 assert(head.startsWith("%PDF-1."), "pdf header");
 assert(bytes.length > 800, "pdf has content");
+
+const longDiagnostico = `${"Pedal de freio baixo ".repeat(12)}FIMDOTEXTO`;
+const longBytes = buildOsPdfBytes({
+    ...baseInput,
+    values: { ...baseInput.values, diagnosticoCliente: longDiagnostico }
+});
+const longText = String.fromCharCode(...longBytes);
+
+assert(longText.includes("FIMDOTEXTO"), "long diagnosis is wrapped, not truncated");
+assert((longText.match(/\/Type \/Page\b/g) ?? []).length === 1, "still a single page");
 
 console.log("exportOsPdf ok", bytes.length);

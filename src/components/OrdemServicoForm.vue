@@ -714,6 +714,7 @@ export default defineComponent({
     data() {
         return {
             formValues: mergeOrdemServicoFormValues(this.values),
+            draftValues: null as OrdemServicoFormValues | null,
             veiculoTipoQuery: "",
             localErrors: {} as Record<string, string>
         };
@@ -957,6 +958,26 @@ export default defineComponent({
         values: {
             handler(next: OrdemServicoFormValues) {
                 this.formValues = mergeOrdemServicoFormValues(next);
+                this.draftValues = null;
+                this.syncVeiculoTipoQuery();
+                this.localErrors = {};
+            }
+        },
+
+        /**
+         * View shows the saved OS, edit restores the draft. Keeping the draft apart
+         * lets "Visualizar" hide unsaved edits without discarding them.
+         */
+        mode: {
+            handler(next: DialogMode, prev: DialogMode) {
+                if (next === "view") {
+                    this.draftValues = this.formValues;
+                    this.formValues = mergeOrdemServicoFormValues(this.values);
+                } else if (prev === "view") {
+                    this.formValues = this.draftValues ?? mergeOrdemServicoFormValues(this.values);
+                    this.draftValues = null;
+                }
+
                 this.syncVeiculoTipoQuery();
                 this.localErrors = {};
             }

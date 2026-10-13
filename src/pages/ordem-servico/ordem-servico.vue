@@ -34,7 +34,7 @@
             v-if="canCreate"
             #headerActions
         >
-            <div class="flex flex-wrap gap-2">
+            <div class="ml-2 flex flex-wrap justify-end gap-2">
                 <Button
                     label="Cadastrar"
                     left-icon="fa-plus"

@@ -1,14 +1,7 @@
-@import "tailwindcss";
-@plugin "../../../cht-base/src/css/borderUtilitiesPlugin.js";
-
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
-@custom-variant light (&:where([data-theme=light], [data-theme=light] *));
-
-@source "./**";
-@source "../**";
-@source "../../../cht-design-system/src";
-@source "../../../cht-shared/src";
-
-@source inline(
-    "bg-{neutral,stone,zinc,slate,gray,red,orange,amber,yellow,lime,green,emerald,teal,cyan,sky,blue,indigo,violet,purple,fuchsia,pink,rose}-{50,{100..900..100}}"
-);
+/*
+ * Client stylesheet. cht-base loads it after its own styles, so rules here win
+ * over base rules of equal specificity and over Tailwind utilities.
+ *
+ * Plain CSS only: do not add `@import "tailwindcss"` or `@source`; cht-base
+ * already builds Tailwind with this client's classes.
+ */

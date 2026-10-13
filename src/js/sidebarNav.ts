@@ -5,6 +5,7 @@ export type SidebarNavLink = {
     label: string;
     link: string;
     leftIcon?: string;
+    rightButton?: object;
 };
 
 export type SidebarNavGroup = {
@@ -39,6 +40,31 @@ function entry(item: SidebarNavItem, digit?: string): NavEntryDef {
     return { item, digit };
 }
 
+/**
+ * Link with a "+" button that opens the page's create modal (`?cadastrar=true`).
+ */
+function linkWithCreate(
+    label: string,
+    href: string,
+    leftIcon: string,
+    tooltip: string
+): SidebarNavLink {
+    return {
+        type: "link",
+        label,
+        link: href,
+        leftIcon,
+        rightButton: {
+            leftIcon: "fa-plus",
+            variant: "outline",
+            class: "p-1.5! mr-2 text-xs!",
+            tooltip,
+            appearWhen: "linkIsOpen",
+            emits: `${href}?cadastrar=true`
+        }
+    };
+}
+
 function link(label: string, href: string, leftIcon?: string): SidebarNavLink {
     return leftIcon
         ? { type: "link", label, link: href, leftIcon }
@@ -68,39 +94,20 @@ const NAV_SECTIONS: NavSectionDef[] = [
         label: "Cadastros",
         entries: [
             entry(
-                {
-                    type: "group",
-                    label: "Funcionários",
-                    leftIcon: "fa-users",
-                    links: [
-                        link("Gerenciar", "/funcionarios"),
-                        link("Cadastrar", "/funcionarios?cadastrar=true", "fa-plus")
-                    ]
-                },
+                linkWithCreate(
+                    "Funcionários",
+                    "/funcionarios",
+                    "fa-users",
+                    "Cadastrar funcionário"
+                ),
                 ACCESS.FUNCIONARIOS
             ),
             entry(
-                {
-                    type: "group",
-                    label: "Clientes",
-                    leftIcon: "fa-user",
-                    links: [
-                        link("Gerenciar", "/clientes"),
-                        link("Cadastrar", "/clientes?cadastrar=true", "fa-plus")
-                    ]
-                },
+                linkWithCreate("Clientes", "/clientes", "fa-user", "Cadastrar cliente"),
                 ACCESS.CLIENTES
             ),
             entry(
-                {
-                    type: "group",
-                    label: "Veículos",
-                    leftIcon: "fa-car",
-                    links: [
-                        link("Gerenciar", "/veiculos"),
-                        link("Cadastrar", "/veiculos?cadastrar=true", "fa-plus")
-                    ]
-                },
+                linkWithCreate("Veículos", "/veiculos", "fa-car", "Cadastrar veículo"),
                 ACCESS.VEICULOS
             )
         ]
@@ -109,16 +116,12 @@ const NAV_SECTIONS: NavSectionDef[] = [
         label: "Ordens de serviço",
         entries: [
             entry(
-                {
-                    type: "group",
-                    label: "Ordens de serviço",
-                    leftIcon: "fa-wrench",
-                    openByDefault: true,
-                    links: [
-                        link("Gerenciar", "/ordem-servico"),
-                        link("Cadastrar", "/ordem-servico?cadastrar=true", "fa-plus")
-                    ]
-                },
+                linkWithCreate(
+                    "Ordens de serviço",
+                    "/ordem-servico",
+                    "fa-wrench",
+                    "Cadastrar ordem de serviço"
+                ),
                 ACCESS.OS
             )
         ]
@@ -135,8 +138,7 @@ const NAV_SECTIONS: NavSectionDef[] = [
                     links: [
                         link("Gerenciar", "/registro-entrada-saida"),
                         link("Entradas", "/registro-entrada-saida#entradas"),
-                        link("Saídas", "/registro-entrada-saida#saidas"),
-                        link("Cadastrar", "/registro-entrada-saida?cadastrar=true", "fa-plus")
+                        link("Saídas", "/registro-entrada-saida#saidas")
                     ]
                 },
                 ACCESS.FINANCEIRO
@@ -156,7 +158,7 @@ function withoutCreateIfNeeded(
     nivel: string,
     digit?: string
 ): SidebarNavItem {
-    if (item.type !== "group" || !digit) {
+    if (!digit) {
         return item;
     }
 
@@ -164,6 +166,10 @@ function withoutCreateIfNeeded(
 
     if (criar === digit || hasAccess(nivel, criar)) {
         return item;
+    }
+
+    if (item.type === "link") {
+        return { ...item, rightButton: undefined };
     }
 
     return {
@@ -177,9 +183,7 @@ export function sidebarNavItems(nivelAcesso: string | undefined): SidebarNavEntr
     const entries: SidebarNavEntry[] = [];
 
     for (const section of NAV_SECTIONS) {
-        const allowed = section.entries.filter(
-            ({ digit }) => !digit || hasAccess(nivel, digit)
-        );
+        const allowed = section.entries.filter(({ digit }) => !digit || hasAccess(nivel, digit));
 
         if (allowed.length === 0) {
             continue;
