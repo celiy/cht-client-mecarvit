@@ -106,7 +106,7 @@
                                     color="green-400"
                                     color-end="green-700"
                                     :data="chartEntradas"
-                                    :hide-label="false"
+                                    show-labels
                                 >
                                     <template #headerRightSide>
                                         <div class="flex w-full justify-end">
@@ -150,6 +150,7 @@
                                     color="green-400"
                                     color-end="green-700"
                                     :data="chartSaidas"
+                                    show-labels
                                 >
                                     <template #headerRightSide>
                                         <div class="flex w-full justify-end">
@@ -190,11 +191,12 @@
                                     negative-color="orange-400"
                                     negative-color-end="orange-700"
                                     :data="chartComparativo"
+                                    :show-labels="fluxoComparativoModo !== 'conjunto'"
+                                    :legend="fluxoComparativoModo === 'conjunto'"
                                 >
                                     <template #headerRightSide>
                                         <div class="flex w-full items-center gap-2">
                                             <Toggleable
-                                                size="small"
                                                 :model-value="fluxoComparativoModo"
                                                 :options="fluxoModoOptions"
                                                 toggleable-position="right"
@@ -251,6 +253,7 @@
                                 header="Ordens por status"
                                 :description="`Criadas ou modificadas: ${periodoLabel(osStatusPeriodo)}`"
                                 :data="chartOsStatus"
+                                show-labels
                             >
                                 <template #headerRightSide>
                                     <div class="flex w-full justify-end">
@@ -287,6 +290,7 @@
                                 header="Ordens de serviço reabertas"
                                 :description="`Reabertas: ${periodoLabel(osReabertasPeriodo)}`"
                                 :data="chartOsReabertas"
+                                show-labels
                                 clickable
                                 color="violet-500"
 
@@ -330,6 +334,7 @@
                                 header="Ordens por status de pagamento"
                                 :description="`Criadas ou modificadas: ${periodoLabel(osPagamentoPeriodo)}`"
                                 :data="chartOsPagamento"
+                                show-labels
                             >
                                 <template #headerRightSide>
                                     <div class="flex w-full justify-end">
@@ -425,7 +430,8 @@ import Modal from "@design/components/Modal.vue";
 import Pagination from "@design/components/custom/Pagination.vue";
 import Toggleable from "@design/components/Toggleable.vue";
 import TableCharts from "@design/components/custom/TableCharts.vue";
-import type { ChartPoint, ChartSeries } from "@design/components/custom/charts/groupChartItems";
+import type { BarChartClick } from "@design/components/custom/charts/BarChart.vue";
+import type { ChartData, ChartSeries } from "@design/components/custom/charts/chartModel";
 import type { OptionItem } from "@design/components/internal/OptionsList.vue";
 import { formatMoneyBrl, notifyHttpError, pageCountFromTotal } from "../js/crudHttp";
 import {
@@ -579,15 +585,15 @@ export default defineComponent({
             return mecarvit.user?.nome?.trim() || "colaborador";
         },
 
-        chartEntradas(): ChartSeries {
+        chartEntradas(): ChartData {
             return this.fluxoChart("entrada");
         },
 
-        chartSaidas(): ChartSeries {
+        chartSaidas(): ChartData {
             return this.fluxoChart("saida");
         },
 
-        chartComparativo(): ChartSeries {
+        chartComparativo(): ChartData {
             return this.fluxoChart("comparativo");
         },
 
@@ -710,7 +716,7 @@ export default defineComponent({
             return meses === 12 ? "últimos 12 meses" : "últimos 6 meses";
         },
 
-        fluxoChart(tipo: "entrada" | "saida" | "comparativo"): ChartSeries {
+        fluxoChart(tipo: "entrada" | "saida" | "comparativo"): ChartData {
             const raw =
                 tipo === "entrada"
                     ? this.fluxoEntradaRaw
@@ -885,13 +891,13 @@ export default defineComponent({
             await this.loadOsReabertas(this.osReabertasPeriodo);
         },
 
-        onOsReabertasBar(item: ChartPoint) {
+        onOsReabertasBar(item: BarChartClick) {
             if (!item.value) {
                 return;
             }
 
             this.reabertasBucket = item.id ?? "";
-            this.reabertasBucketLabel = item.dateLong;
+            this.reabertasBucketLabel = item.category.long;
             this.reabertasPage = 1;
             this.reabertasModalOpen = true;
             void this.loadOsReabertasList();

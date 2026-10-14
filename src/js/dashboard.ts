@@ -1,4 +1,4 @@
-import type { ChartSeries } from "@design/components/custom/charts/groupChartItems";
+import type { ChartData, ChartSeries } from "@design/components/custom/charts/chartModel";
 import type { OptionItem } from "@design/components/internal/OptionsList.vue";
 import { PAGAMENTO_SITUACAO } from "@shared/mecarvit/pagamentoSituacao";
 import { formatTableLabel } from "./formatTableLabel";
@@ -88,35 +88,46 @@ export type GroupCountItem = {
     id?: string;
 };
 
+/**
+ * Paid flow as chart data. `diferenca` is one signed series (balance); `conjunto` is two
+ * series side by side (entradas and saídas).
+ */
 export function fluxoToChartSeries(
     label: string,
     items: FluxoPagoItem[],
     displayAs: "currency" | "sum" = "currency",
     modo: FluxoModo = "diferenca",
     yearly = false
-): ChartSeries {
+): ChartData {
+    const place = (item: FluxoPagoItem) =>
+        yearly
+            ? { group: String(new Date(item.date).getFullYear()) }
+            : { date: new Date(item.date) };
+
+    if (modo === "conjunto") {
+        return [
+            {
+                label: "Entradas",
+                color: "green-500",
+                displayAs,
+                items: items.map((item) => ({
+                    ...place(item),
+                    value: item.entrada ?? Math.max(0, item.value)
+                }))
+            },
+            {
+                label: "Saídas",
+                color: "orange-500",
+                displayAs,
+                items: items.map((item) => ({ ...place(item), value: item.saida ?? 0 }))
+            }
+        ];
+    }
+
     return {
         label,
         displayAs,
-        items: items.map((item) => {
-            const year = new Date(item.date).getFullYear();
-            const place = yearly
-                ? { group: String(year) }
-                : { date: new Date(item.date) };
-
-            if (modo === "conjunto") {
-                return {
-                    ...place,
-                    value: item.entrada ?? Math.max(0, item.value),
-                    valueNegative: item.saida ?? 0
-                };
-            }
-
-            return {
-                ...place,
-                value: item.value
-            };
-        })
+        items: items.map((item) => ({ ...place(item), value: item.value }))
     };
 }
 
